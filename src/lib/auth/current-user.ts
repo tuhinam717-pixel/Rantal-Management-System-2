@@ -20,6 +20,7 @@ export async function getCurrentUser() {
       phone: true,
       role: true,
       imageUrl: true,
+      dashboardWidgets: true,
       isActive: true,
       createdAt: true,
     },

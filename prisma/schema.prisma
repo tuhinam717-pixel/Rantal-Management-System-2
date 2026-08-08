@@ -12,10 +12,10 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
   // Pooled connection: serverless functions open many short-lived connections,
   // so a pooler (Neon/Supabase pgbouncer) is required in production.
-  url      = env("DATABASE_URL")
+  url       = env("DATABASE_URL")
   // Migrations need a direct, unpooled connection — poolers in transaction mode
   // can't run the DDL that `prisma migrate deploy` issues. Locally both point
   // at the same server.
@@ -32,24 +32,27 @@ enum Role {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  name         String
-  email        String   @unique
-  phone        String?
-  passwordHash String
-  role         Role     @default(CUSTOMER)
-  imageUrl     String?
-  isActive     Boolean  @default(true)
-  lastLoginAt  DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id               String    @id @default(cuid())
+  name             String
+  email            String    @unique
+  phone            String?
+  passwordHash     String
+  role             Role      @default(CUSTOMER)
+  imageUrl         String?
+  /// Dashboard tiles this admin chose to show, in order, as a JSON array of
+  /// widget keys. Null = the default set.
+  dashboardWidgets String?
+  isActive         Boolean   @default(true)
+  lastLoginAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-  addresses     Address[]
-  orders        RentalOrder[]
-  quotations    Quotation[]
-  cart          Cart?
+  addresses      Address[]
+  orders         RentalOrder[]
+  quotations     Quotation[]
+  cart           Cart?
   paymentMethods PaymentMethod[]
-  notifications Notification[]
+  notifications  Notification[]
 
   @@index([role])
   @@map("users")
@@ -111,24 +114,24 @@ model Category {
 }
 
 model Product {
-  id            String   @id @default(cuid())
-  name          String
-  slug          String   @unique
-  description   String?
-  sku           String   @unique
-  imageUrl      String?
-  categoryId    String?
-  category      Category? @relation(fields: [categoryId], references: [id])
-  isRentable    Boolean  @default(true)
-  totalStock    Int      @default(0)
-  reservedStock Int      @default(0)
+  id               String    @id @default(cuid())
+  name             String
+  slug             String    @unique
+  description      String?
+  sku              String    @unique
+  imageUrl         String?
+  categoryId       String?
+  category         Category? @relation(fields: [categoryId], references: [id])
+  isRentable       Boolean   @default(true)
+  totalStock       Int       @default(0)
+  reservedStock    Int       @default(0)
   /// Units withdrawn from service while a repair job is open. Availability is
   /// totalStock - reservedStock - underRepairStock.
-  underRepairStock Int   @default(0)
+  underRepairStock Int       @default(0)
 
   // Deposit defaults, overridable per pricelist / order.
-  depositType   DepositType @default(FIXED)
-  depositValue  Decimal     @default(0) @db.Decimal(12, 2)
+  depositType  DepositType @default(FIXED)
+  depositValue Decimal     @default(0) @db.Decimal(12, 2)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -139,6 +142,7 @@ model Product {
   quotationLines QuotationLine[]
   cartItems      CartItem[]
   repairJobs     RepairJob[]
+  trackers       AssetTracker[]
 
   @@index([categoryId])
   @@map("products")
@@ -263,18 +267,18 @@ enum QuotationStatus {
 }
 
 model QuotationTemplate {
-  id        String   @id @default(cuid())
-  name      String
-  header    String?
-  footer    String?
-  terms     String?
-  isDefault Boolean  @default(false)
+  id                  String   @id @default(cuid())
+  name                String
+  header              String?
+  footer              String?
+  terms               String?
+  isDefault           Boolean  @default(false)
   /// Share of the total the client pays up front to confirm the quotation.
   /// From the mockup's "Payment Terms ___ %".
-  paymentTermsPercent Int @default(100)
+  paymentTermsPercent Int      @default(100)
   /// How long the quotation stays valid, overriding the org default.
   validityDays        Int?
-  createdAt DateTime @default(now())
+  createdAt           DateTime @default(now())
 
   quotations Quotation[]
 
@@ -282,20 +286,20 @@ model QuotationTemplate {
 }
 
 model Quotation {
-  id          String          @id @default(cuid())
-  number      String          @unique
-  customerId  String
-  customer    User            @relation(fields: [customerId], references: [id])
-  templateId  String?
-  template    QuotationTemplate? @relation(fields: [templateId], references: [id])
-  status      QuotationStatus @default(DRAFT)
-  subtotal    Decimal         @default(0) @db.Decimal(12, 2)
-  depositTotal Decimal        @default(0) @db.Decimal(12, 2)
-  total       Decimal         @default(0) @db.Decimal(12, 2)
-  validUntil  DateTime?
-  notes       String?
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  id           String             @id @default(cuid())
+  number       String             @unique
+  customerId   String
+  customer     User               @relation(fields: [customerId], references: [id])
+  templateId   String?
+  template     QuotationTemplate? @relation(fields: [templateId], references: [id])
+  status       QuotationStatus    @default(DRAFT)
+  subtotal     Decimal            @default(0) @db.Decimal(12, 2)
+  depositTotal Decimal            @default(0) @db.Decimal(12, 2)
+  total        Decimal            @default(0) @db.Decimal(12, 2)
+  validUntil   DateTime?
+  notes        String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
 
   lines QuotationLine[]
   order RentalOrder?
@@ -362,10 +366,10 @@ model RentalOrder {
   /// Set when the customer actually hands the goods back; drives late-fee maths.
   returnedAt  DateTime?
 
-  subtotal    Decimal @default(0) @db.Decimal(12, 2)
+  subtotal     Decimal @default(0) @db.Decimal(12, 2)
   depositTotal Decimal @default(0) @db.Decimal(12, 2)
   lateFeeTotal Decimal @default(0) @db.Decimal(12, 2)
-  total       Decimal @default(0) @db.Decimal(12, 2)
+  total        Decimal @default(0) @db.Decimal(12, 2)
 
   notes     String?
   createdAt DateTime @default(now())
@@ -378,6 +382,7 @@ model RentalOrder {
   pickup   Pickup?
   return   Return?
   invoices Invoice[]
+  trackers AssetTracker[]
 
   @@index([customerId])
   @@index([status])
@@ -443,14 +448,14 @@ enum InvoiceKind {
 }
 
 model Invoice {
-  id        String      @id @default(cuid())
-  number    String      @unique
-  orderId   String
-  order     RentalOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  kind      InvoiceKind @default(RENTAL)
-  amount    Decimal     @db.Decimal(12, 2)
-  issuedAt  DateTime    @default(now())
-  pdfUrl    String?
+  id       String      @id @default(cuid())
+  number   String      @unique
+  orderId  String
+  order    RentalOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  kind     InvoiceKind @default(RENTAL)
+  amount   Decimal     @db.Decimal(12, 2)
+  issuedAt DateTime    @default(now())
+  pdfUrl   String?
 
   @@index([orderId])
   @@map("invoices")
@@ -475,17 +480,17 @@ enum DepositStatus {
 }
 
 model SecurityDeposit {
-  id       String        @id @default(cuid())
-  orderId  String        @unique
-  order    RentalOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  type     DepositType   @default(FIXED)
+  id      String        @id @default(cuid())
+  orderId String        @unique
+  order   RentalOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  type    DepositType   @default(FIXED)
   /// Configured value: an amount when FIXED, a percentage when PERCENTAGE.
-  value    Decimal       @db.Decimal(12, 2)
-  amount   Decimal       @db.Decimal(12, 2)
-  status   DepositStatus @default(PENDING)
+  value   Decimal       @db.Decimal(12, 2)
+  amount  Decimal       @db.Decimal(12, 2)
+  status  DepositStatus @default(PENDING)
 
-  deductedAmount Decimal  @default(0) @db.Decimal(12, 2)
-  refundedAmount Decimal  @default(0) @db.Decimal(12, 2)
+  deductedAmount Decimal   @default(0) @db.Decimal(12, 2)
+  refundedAmount Decimal   @default(0) @db.Decimal(12, 2)
   collectedAt    DateTime?
   settledAt      DateTime?
 
@@ -505,13 +510,13 @@ enum DepositTxnType {
 
 /// Append-only ledger giving the "complete deposit history" the brief asks for.
 model DepositTransaction {
-  id        String         @id @default(cuid())
+  id        String          @id @default(cuid())
   depositId String
   deposit   SecurityDeposit @relation(fields: [depositId], references: [id], onDelete: Cascade)
   type      DepositTxnType
-  amount    Decimal        @db.Decimal(12, 2)
+  amount    Decimal         @db.Decimal(12, 2)
   note      String?
-  createdAt DateTime       @default(now())
+  createdAt DateTime        @default(now())
 
   @@index([depositId])
   @@map("deposit_transactions")
@@ -548,15 +553,15 @@ enum LateFeeStatus {
 }
 
 model LateFee {
-  id          String        @id @default(cuid())
-  orderId     String
-  order       RentalOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  ruleId      String?
-  rule        LateFeeRule?  @relation(fields: [ruleId], references: [id])
-  overdueUnits Int          @default(0)
-  amount      Decimal       @db.Decimal(12, 2)
-  status      LateFeeStatus @default(CALCULATED)
-  calculatedAt DateTime     @default(now())
+  id           String        @id @default(cuid())
+  orderId      String
+  order        RentalOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  ruleId       String?
+  rule         LateFeeRule?  @relation(fields: [ruleId], references: [id])
+  overdueUnits Int           @default(0)
+  amount       Decimal       @db.Decimal(12, 2)
+  status       LateFeeStatus @default(CALCULATED)
+  calculatedAt DateTime      @default(now())
 
   @@index([orderId])
   @@map("late_fees")
@@ -574,18 +579,18 @@ enum PickupStatus {
 }
 
 model Pickup {
-  id           String       @id @default(cuid())
-  orderId      String       @unique
-  order        RentalOrder  @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  scheduledFor DateTime
-  status       PickupStatus @default(SCHEDULED)
+  id            String       @id @default(cuid())
+  orderId       String       @unique
+  order         RentalOrder  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  scheduledFor  DateTime
+  status        PickupStatus @default(SCHEDULED)
   /// Position within the day's route, for sequence planning.
   routeSequence Int?
-  assignedTo   String?
-  barcode      String?
-  checklist    Json?
-  confirmedAt  DateTime?
-  notes        String?
+  assignedTo    String?
+  barcode       String?
+  checklist     Json?
+  confirmedAt   DateTime?
+  notes         String?
 
   @@index([scheduledFor])
   @@map("pickups")
@@ -654,23 +659,23 @@ enum RepairStatus {
 /// inspection as damaged opens one of these automatically, which withdraws the
 /// units from availability until the job is closed.
 model RepairJob {
-  id           String       @id @default(cuid())
-  productId    String
-  product      Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
-  inspectionId String?      @unique
-  inspection   ReturnInspection? @relation(fields: [inspectionId], references: [id], onDelete: SetNull)
+  id            String            @id @default(cuid())
+  productId     String
+  product       Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  inspectionId  String?           @unique
+  inspection    ReturnInspection? @relation(fields: [inspectionId], references: [id], onDelete: SetNull)
   /// The rental that caused the damage, for traceability.
-  orderNumber  String?
-  status       RepairStatus @default(PENDING)
-  issue        String
-  quantity     Int          @default(1)
-  estimatedCost Decimal     @default(0) @db.Decimal(12, 2)
-  actualCost   Decimal?     @db.Decimal(12, 2)
-  assignedTo   String?
-  notes        String?
-  openedAt     DateTime     @default(now())
-  startedAt    DateTime?
-  completedAt  DateTime?
+  orderNumber   String?
+  status        RepairStatus      @default(PENDING)
+  issue         String
+  quantity      Int               @default(1)
+  estimatedCost Decimal           @default(0) @db.Decimal(12, 2)
+  actualCost    Decimal?          @db.Decimal(12, 2)
+  assignedTo    String?
+  notes         String?
+  openedAt      DateTime          @default(now())
+  startedAt     DateTime?
+  completedAt   DateTime?
 
   @@index([productId])
   @@index([status])
@@ -721,4 +726,63 @@ model OrgSettings {
   updatedAt           DateTime    @updatedAt
 
   @@map("org_settings")
+}
+
+// ---------------------------------------------------------------------------
+// IoT asset tracking
+//
+// A tracker is a physical tag on one rentable unit. Devices POST telemetry to
+// /api/iot/telemetry; the admin console reads the latest reading per tracker
+// and flags any that have gone quiet. Nothing here assumes a particular vendor
+// — anything that can make an HTTP request works.
+// ---------------------------------------------------------------------------
+
+enum TrackerStatus {
+  IDLE
+  OUT_ON_RENT
+  IN_TRANSIT
+  MISSING
+}
+
+model AssetTracker {
+  id       String  @id @default(cuid())
+  /// Printed on the tag; what the device sends to identify itself.
+  deviceId String  @unique
+  label    String?
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  /// Set while the unit is out with a customer.
+  orderId String?
+  order   RentalOrder? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  status     TrackerStatus @default(IDLE)
+  batteryPct Int?
+  latitude   Float?
+  longitude  Float?
+  lastSeenAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pings TrackerPing[]
+
+  @@index([productId])
+  @@index([status])
+  @@map("asset_trackers")
+}
+
+model TrackerPing {
+  id        String       @id @default(cuid())
+  trackerId String
+  tracker   AssetTracker @relation(fields: [trackerId], references: [id], onDelete: Cascade)
+
+  batteryPct Int?
+  latitude   Float?
+  longitude  Float?
+  recordedAt DateTime @default(now())
+
+  @@index([trackerId, recordedAt])
+  @@map("tracker_pings")
 }

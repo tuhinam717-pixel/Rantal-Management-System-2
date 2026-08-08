@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Mail, Phone, Users } from "lucide-react";
+import { Mail, Pencil, Phone, UserCheck, UserX, Users } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import {
   EmptyState,
   TableRow,
 } from "@/components/ui/data-table";
+import { CustomerDialog } from "@/components/admin/customer-form";
 import { ListToolbar } from "@/components/ui/list-toolbar";
 import { PageHeader } from "@/components/ui/page-header";
 import { Pagination } from "@/components/ui/pagination";
@@ -18,6 +19,8 @@ import { resolveSort, textSearch, type SortOption } from "@/lib/list-query";
 import { resolveView } from "@/lib/view-mode";
 import { requireRole } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma";
+import { setCustomerActiveAction } from "./actions";
+import { Button } from "@/components/ui/button";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Prisma } from "@prisma/client";
 
@@ -38,6 +41,7 @@ const COLUMNS = [
   { key: "ltv", label: "Lifetime value", align: "right" as const },
   { key: "joined", label: "Joined" },
   { key: "status", label: "Status" },
+  { key: "actions", label: "", align: "right" as const },
 ];
 
 export default async function AdminCustomersPage({
@@ -99,7 +103,12 @@ export default async function AdminCustomersPage({
       <PageHeader
         title="Customers"
         description={`${total} registered portal users`}
-        actions={<ViewToggle current={view} />}
+        actions={
+          <>
+            <ViewToggle current={view} />
+            <CustomerDialog />
+          </>
+        }
       />
 
       <ListToolbar
@@ -184,6 +193,39 @@ export default async function AdminCustomersPage({
                     <Badge tone="danger">{overdue} overdue rental</Badge>
                   </div>
                 )}
+
+                <div className="mt-4 flex items-center gap-1 border-t border-line pt-3">
+                  <CustomerDialog
+                    initial={{
+                      id: customer.id,
+                      name: customer.name,
+                      email: customer.email,
+                      phone: customer.phone ?? "",
+                      imageUrl: customer.imageUrl ?? "",
+                    }}
+                    trigger={
+                      <Button variant="soft" size="sm" className="flex-1">
+                        <Pencil className="size-4" aria-hidden />
+                        Edit
+                      </Button>
+                    }
+                  />
+                  <form action={setCustomerActiveAction}>
+                    <input type="hidden" name="id" value={customer.id} />
+                    <input
+                      type="hidden"
+                      name="isActive"
+                      value={customer.isActive ? "false" : "true"}
+                    />
+                    <Button type="submit" variant="ghost" size="sm">
+                      {customer.isActive ? (
+                        <UserX className="size-4" aria-hidden />
+                      ) : (
+                        <UserCheck className="size-4" aria-hidden />
+                      )}
+                    </Button>
+                  </form>
+                </div>
               </Card>
             );
           })}
@@ -232,6 +274,46 @@ export default async function AdminCustomersPage({
                   <Badge tone={customer.isActive ? "success" : "neutral"}>
                     {customer.isActive ? "Active" : "Deactivated"}
                   </Badge>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center justify-end gap-1">
+                    <CustomerDialog
+                      initial={{
+                        id: customer.id,
+                        name: customer.name,
+                        email: customer.email,
+                        phone: customer.phone ?? "",
+                        imageUrl: customer.imageUrl ?? "",
+                      }}
+                      trigger={
+                        <Button variant="soft" size="sm">
+                          <Pencil className="size-4" aria-hidden />
+                          Edit
+                        </Button>
+                      }
+                    />
+                    <form action={setCustomerActiveAction}>
+                      <input type="hidden" name="id" value={customer.id} />
+                      <input
+                        type="hidden"
+                        name="isActive"
+                        value={customer.isActive ? "false" : "true"}
+                      />
+                      <Button type="submit" variant="ghost" size="sm">
+                        {customer.isActive ? (
+                          <>
+                            <UserX className="size-4" aria-hidden />
+                            Deactivate
+                          </>
+                        ) : (
+                          <>
+                            <UserCheck className="size-4" aria-hidden />
+                            Reactivate
+                          </>
+                        )}
+                      </Button>
+                    </form>
+                  </div>
                 </td>
               </TableRow>
             );

@@ -2,9 +2,10 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { Plus, UserPlus } from "lucide-react";
 
 import { Alert } from "@/components/ui/alert";
+import { CustomerDialog } from "@/components/admin/customer-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
@@ -46,6 +47,11 @@ export function QuotationBuilder({
     createQuotationAction,
     {}
   );
+  const [customerId, setCustomerId] = useState("");
+  // Customers created from inside this dialog, before the page revalidates.
+  const [extraCustomers, setExtraCustomers] = useState<
+    { id: string; name: string; email: string }[]
+  >([]);
 
   useEffect(() => {
     if (state.ok && open) {
@@ -114,13 +120,45 @@ export function QuotationBuilder({
 
       {state.error && <Alert tone="error">{state.error}</Alert>}
 
-      <Select label="Customer" name="customerId" required>
-        {customers.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name} ({c.email})
-          </option>
-        ))}
-      </Select>
+      {/*
+        The walk-in case in the brief: someone at the counter has no portal
+        account yet. Creating one inline keeps the half-built quotation intact,
+        which navigating away to the customers page would not.
+      */}
+      <div className="space-y-1.5">
+        <div className="flex items-end justify-between gap-3">
+          <span className="text-sm font-medium text-ink-700">Customer</span>
+          <CustomerDialog
+            onCreated={(created) => {
+              setExtraCustomers((prev) => [created, ...prev]);
+              setCustomerId(created.id);
+            }}
+            trigger={
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:text-brand-800"
+              >
+                <UserPlus className="size-4" aria-hidden />
+                New customer
+              </button>
+            }
+          />
+        </div>
+
+        <Select
+          name="customerId"
+          required
+          value={customerId}
+          onChange={(e) => setCustomerId(e.target.value)}
+        >
+          <option value="">Select a customer…</option>
+          {[...extraCustomers, ...customers].map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name} ({c.email})
+            </option>
+          ))}
+        </Select>
+      </div>
 
       <Select
         label="Product"
