@@ -6,7 +6,12 @@ import { z } from "zod";
 import { requireUser } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma";
 
-export type FormState = { error?: string; ok?: boolean };
+export type FormState = {
+  error?: string;
+  ok?: boolean;
+  /** Set by saveAddressAction so checkout can select the address it just created. */
+  addressId?: string;
+};
 
 const profileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters").max(80),
@@ -77,7 +82,7 @@ export async function saveAddressAction(
   // First address a customer saves is their default, whatever they ticked.
   const makeDefault = isDefault || existingCount === 0;
 
-  await prisma.$transaction(async (tx) => {
+  const savedId = await prisma.$transaction(async (tx) => {
     if (makeDefault) {
       await tx.address.updateMany({
         where: { userId: user.id },
@@ -100,14 +105,16 @@ export async function saveAddressAction(
         where: { id, userId: user.id },
         data: { ...data, userId: undefined },
       });
-    } else {
-      await tx.address.create({ data });
+      return id;
     }
+
+    const created = await tx.address.create({ data });
+    return created.id;
   });
 
   revalidatePath("/profile/addresses");
   revalidatePath("/checkout");
-  return { ok: true };
+  return { ok: true, addressId: savedId };
 }
 
 export async function setDefaultAddressAction(formData: FormData) {

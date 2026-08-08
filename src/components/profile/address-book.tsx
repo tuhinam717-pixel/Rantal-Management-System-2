@@ -5,7 +5,7 @@ import { Check, MapPin, Pencil, Plus, X } from "lucide-react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { AddressFields } from "@/components/profile/address-fields";
 import { DeleteButton } from "@/components/admin/delete-button";
 import {
   deleteAddressAction,
@@ -132,59 +132,10 @@ export function AddressBook({ addresses }: { addresses: AddressVM[] }) {
           {state.error && <Alert tone="error">{state.error}</Alert>}
           {state.ok && <Alert tone="success">Address saved.</Alert>}
 
-          <Input
-            label="Label"
-            name="label"
-            defaultValue={target?.label ?? ""}
-            placeholder="Home, Office, Site"
+          <AddressFields
+            initial={target}
+            defaultChecked={target?.isDefault ?? addresses.length === 0}
           />
-
-          <Input
-            label="Address line 1"
-            name="line1"
-            defaultValue={target?.line1}
-            required
-          />
-          <Input
-            label="Address line 2"
-            name="line2"
-            defaultValue={target?.line2 ?? ""}
-          />
-
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Input label="City" name="city" defaultValue={target?.city} required />
-            <Input
-              label="State"
-              name="state"
-              defaultValue={target?.state}
-              required
-            />
-            <Input
-              label="Postcode"
-              name="postalCode"
-              defaultValue={target?.postalCode}
-              required
-            />
-          </div>
-
-          <Input
-            label="Country"
-            name="country"
-            defaultValue={target?.country ?? "India"}
-          />
-
-          <label className="flex items-center gap-2.5">
-            <input
-              type="checkbox"
-              name="isDefault"
-              value="true"
-              defaultChecked={target?.isDefault ?? addresses.length === 0}
-              className="size-4 rounded border-slate-300 text-brand-600 focus:ring-brand-600"
-            />
-            <span className="text-sm text-ink-700">
-              Use as my default delivery address
-            </span>
-          </label>
 
           <div className="flex gap-3">
             <Button type="submit" isLoading={isPending}>

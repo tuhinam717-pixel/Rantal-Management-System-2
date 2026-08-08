@@ -1,11 +1,13 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { Store, Truck } from "lucide-react";
+import { useActionState, useCallback, useEffect, useState } from "react";
+import { MapPin, Store, Truck } from "lucide-react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { FieldRow } from "@/components/ui/form-shell";
+import { AddAddressDialog } from "@/components/cart/add-address-dialog";
 import { checkoutAction, type CheckoutState } from "@/app/(portal)/checkout/actions";
 import { cn } from "@/lib/utils";
 import type { AddressVM } from "@/types";
@@ -17,11 +19,37 @@ export function CheckoutForm({ addresses }: { addresses: AddressVM[] }) {
   );
 
   const [fulfilment, setFulfilment] = useState<"DELIVERY" | "STORE_PICKUP">(
-    addresses.length > 0 ? "DELIVERY" : "STORE_PICKUP"
+    "DELIVERY"
   );
   const [addressId, setAddressId] = useState(
     addresses.find((a) => a.isDefault)?.id ?? addresses[0]?.id ?? ""
   );
+
+  // A newly added address arrives via router.refresh(); adopt it if the current
+  // selection no longer exists (or nothing was selected yet).
+  useEffect(() => {
+    if (addresses.length === 0) return;
+    if (!addresses.some((a) => a.id === addressId)) {
+      setAddressId(addresses.find((a) => a.isDefault)?.id ?? addresses[0].id);
+    }
+  }, [addresses, addressId]);
+
+  const handleSaved = useCallback((id: string) => setAddressId(id), []);
+
+  const options = [
+    {
+      value: "DELIVERY" as const,
+      Icon: Truck,
+      title: "Deliver to me",
+      body: "We bring it to your address.",
+    },
+    {
+      value: "STORE_PICKUP" as const,
+      Icon: Store,
+      title: "Collect from store",
+      body: "Pick it up and drop it back yourself.",
+    },
+  ];
 
   return (
     <form action={formAction} className="space-y-6">
@@ -32,101 +60,105 @@ export function CheckoutForm({ addresses }: { addresses: AddressVM[] }) {
         <input type="hidden" name="shippingAddressId" value={addressId} />
       )}
 
-      <section className="rounded-xl border border-slate-200 bg-white p-5">
-        <h2 className="text-sm font-semibold text-ink-900">How do you want it?</h2>
+      <section className="rounded-2xl border border-line bg-surface p-5 shadow-card">
+        <h2 className="text-sm font-semibold text-ink-900">
+          How do you want it?
+        </h2>
 
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <button
-            type="button"
-            onClick={() => setFulfilment("DELIVERY")}
-            className={cn(
-              "flex items-start gap-3 rounded-lg border p-3.5 text-left transition-colors",
-              fulfilment === "DELIVERY"
-                ? "border-brand-600 bg-brand-50 ring-1 ring-brand-600"
-                : "border-slate-200 hover:border-slate-300"
-            )}
-          >
-            <Truck className="mt-0.5 size-4 shrink-0 text-brand-600" aria-hidden />
-            <span>
-              <span className="block text-sm font-medium text-ink-900">
-                Deliver to me
+          {options.map(({ value, Icon, title, body }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setFulfilment(value)}
+              aria-pressed={fulfilment === value}
+              className={cn(
+                "flex items-start gap-3 rounded-xl border p-3.5 text-left transition-colors",
+                fulfilment === value
+                  ? "border-brand-500 bg-brand-100 ring-1 ring-brand-500"
+                  : "border-line hover:border-brand-300"
+              )}
+            >
+              <Icon className="mt-0.5 size-4 shrink-0 text-brand-700" aria-hidden />
+              <span>
+                <span className="block text-sm font-medium text-ink-900">
+                  {title}
+                </span>
+                <span className="block text-xs text-ink-500">{body}</span>
               </span>
-              <span className="block text-xs text-ink-500">
-                We bring it to your address.
-              </span>
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setFulfilment("STORE_PICKUP")}
-            className={cn(
-              "flex items-start gap-3 rounded-lg border p-3.5 text-left transition-colors",
-              fulfilment === "STORE_PICKUP"
-                ? "border-brand-600 bg-brand-50 ring-1 ring-brand-600"
-                : "border-slate-200 hover:border-slate-300"
-            )}
-          >
-            <Store className="mt-0.5 size-4 shrink-0 text-brand-600" aria-hidden />
-            <span>
-              <span className="block text-sm font-medium text-ink-900">
-                Collect from store
-              </span>
-              <span className="block text-xs text-ink-500">
-                Pick it up and drop it back yourself.
-              </span>
-            </span>
-          </button>
+            </button>
+          ))}
         </div>
 
         {fulfilment === "DELIVERY" && (
-          <div className="mt-4 space-y-2">
+          <div className="mt-4 space-y-3">
             {addresses.length === 0 ? (
-              <Alert tone="info">
-                You have no saved addresses. Add one from your profile, or
-                choose “Collect from store”.
-              </Alert>
+              <div className="rounded-xl border border-dashed border-brand-300 bg-brand-50/50 px-5 py-8 text-center">
+                <span className="mx-auto grid size-10 place-items-center rounded-full bg-brand-200 text-brand-800">
+                  <MapPin className="size-4" aria-hidden />
+                </span>
+                <p className="mt-3 text-sm font-medium text-ink-900">
+                  No delivery address yet
+                </p>
+                <p className="mx-auto mt-1 max-w-xs text-sm text-ink-500">
+                  Add one here to get this rental delivered, or switch to
+                  collecting from the store.
+                </p>
+                <div className="mt-4 flex justify-center">
+                  <AddAddressDialog isFirstAddress onSaved={handleSaved} />
+                </div>
+              </div>
             ) : (
-              addresses.map((address) => (
-                <label
-                  key={address.id}
-                  className={cn(
-                    "flex cursor-pointer gap-3 rounded-lg border p-3.5 transition-colors",
-                    addressId === address.id
-                      ? "border-brand-600 bg-brand-50"
-                      : "border-slate-200 hover:border-slate-300"
-                  )}
-                >
-                  <input
-                    type="radio"
-                    name="addressChoice"
-                    checked={addressId === address.id}
-                    onChange={() => setAddressId(address.id)}
-                    className="mt-1 size-4 text-brand-600 focus:ring-brand-600"
-                  />
-                  <span className="text-sm">
-                    <span className="block font-medium text-ink-900">
-                      {address.label ?? "Address"}
-                      {address.isDefault && (
-                        <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-normal text-ink-500">
-                          Default
-                        </span>
+              <>
+                <div className="space-y-2">
+                  {addresses.map((address) => (
+                    <label
+                      key={address.id}
+                      className={cn(
+                        "flex cursor-pointer gap-3 rounded-xl border p-3.5 transition-colors",
+                        addressId === address.id
+                          ? "border-brand-500 bg-brand-100"
+                          : "border-line hover:border-brand-300"
                       )}
-                    </span>
-                    <span className="block text-ink-500">
-                      {address.line1}
-                      {address.line2 ? `, ${address.line2}` : ""}, {address.city},{" "}
-                      {address.state} {address.postalCode}
-                    </span>
-                  </span>
-                </label>
-              ))
+                    >
+                      <input
+                        type="radio"
+                        name="addressChoice"
+                        checked={addressId === address.id}
+                        onChange={() => setAddressId(address.id)}
+                        className="mt-1 size-4 border-line text-brand-600 focus:ring-brand-600"
+                      />
+                      <span className="text-sm">
+                        <span className="block font-medium text-ink-900">
+                          {address.label ?? "Address"}
+                          {address.isDefault && (
+                            <span className="ml-2 rounded-full bg-brand-200 px-2 py-0.5 text-xs font-normal text-brand-800">
+                              Default
+                            </span>
+                          )}
+                        </span>
+                        <span className="block text-ink-500">
+                          {address.line1}
+                          {address.line2 ? `, ${address.line2}` : ""},{" "}
+                          {address.city}, {address.state} {address.postalCode}
+                        </span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+
+                <AddAddressDialog
+                  isFirstAddress={false}
+                  onSaved={handleSaved}
+                  variant="link"
+                />
+              </>
             )}
           </div>
         )}
       </section>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-5">
+      <section className="rounded-2xl border border-line bg-surface p-5 shadow-card">
         <h2 className="text-sm font-semibold text-ink-900">Payment</h2>
         <p className="mt-1 text-xs text-ink-500">
           You are paying the rent and the refundable security deposit together.
@@ -148,7 +180,7 @@ export function CheckoutForm({ addresses }: { addresses: AddressVM[] }) {
             placeholder="4242 4242 4242 4242"
             required
           />
-          <div className="grid grid-cols-2 gap-4">
+          <FieldRow>
             <Input
               label="Expiry"
               name="expiry"
@@ -164,11 +196,17 @@ export function CheckoutForm({ addresses }: { addresses: AddressVM[] }) {
               autoComplete="cc-csc"
               required
             />
-          </div>
+          </FieldRow>
         </div>
       </section>
 
-      <Button type="submit" size="lg" className="w-full" isLoading={isPending}>
+      <Button
+        type="submit"
+        size="lg"
+        className="w-full"
+        isLoading={isPending}
+        disabled={fulfilment === "DELIVERY" && !addressId}
+      >
         {isPending ? "Placing order…" : "Pay and confirm rental"}
       </Button>
     </form>
