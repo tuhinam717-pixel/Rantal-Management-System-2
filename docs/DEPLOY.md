@@ -11,7 +11,7 @@ So before deploying you need a hosted Postgres. Any of these work:
 | Provider | Free tier | Notes |
 | --- | --- | --- |
 | **Neon** | Yes | Fastest to set up, built for serverless, gives you both a pooled and a direct URL |
-| Supabase | Yes | Also fine; use the "Connection pooling" string for `DATABASE_URL` |
+| **Supabase** | Yes | Works well, but you must pick the right two of its three strings — see below |
 | Vercel Postgres | Yes | Runs on Neon; auto-injects env vars into the project |
 
 ## Why two database URLs
@@ -40,6 +40,31 @@ connection strings from the dashboard:
 
 > If your password contains `@`, `:`, `/` or `?`, percent-encode it
 > (`@` becomes `%40`) or the connection string parses the wrong host.
+
+#### If you use Supabase
+
+Supabase offers three connection strings and the choice matters:
+
+| Shown as | Port | Use it for |
+| --- | --- | --- |
+| Direct connection | 5432 | **Don't.** New projects are IPv6-only here, and Vercel can't reach it |
+| **Transaction pooler** | **6543** | `DATABASE_URL` |
+| **Session pooler** | **5432** | `DIRECT_URL` |
+
+Both pooler strings live on `aws-0-<region>.pooler.supabase.com`, which is IPv4,
+so Vercel can reach them.
+
+The transaction pooler needs `?pgbouncer=true` or Prisma fails at runtime with
+`prepared statement "s0" already exists` — pgbouncer in transaction mode reuses
+connections, so prepared statements must be turned off:
+
+```
+DATABASE_URL="postgresql://postgres.<ref>:<pwd>@aws-0-<region>.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1"
+DIRECT_URL="postgresql://postgres.<ref>:<pwd>@aws-0-<region>.pooler.supabase.com:5432/postgres"
+```
+
+`connection_limit=1` keeps each serverless function to a single connection,
+which is what you want when many functions run concurrently.
 
 ### 2. Push the code
 
@@ -107,8 +132,13 @@ Then sign in at `https://<your-app>.vercel.app` with
 **Build fails with `Can't reach database server`** — `DATABASE_URL`/`DIRECT_URL`
 are missing or wrong on Vercel. Check with `vercel env ls`.
 
-**`prepared statement "s0" already exists`** — you used the pooled URL for
-`DIRECT_URL`. Migrations need the unpooled host.
+**`prepared statement "s0" already exists`** — either `DATABASE_URL` is missing
+`?pgbouncer=true`, or you used a transaction-mode pooler for `DIRECT_URL`.
+Migrations need a session-mode or direct connection.
+
+**`Can't reach database server` on Supabase specifically** — you probably used
+the "Direct connection" string. It is IPv6-only on new projects; switch to the
+session pooler for `DIRECT_URL`.
 
 **Images don't load** — `next.config.ts` only allows `images.unsplash.com` and
 `res.cloudinary.com`. Add any other host to `remotePatterns`.
