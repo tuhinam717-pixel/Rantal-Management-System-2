@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { Search } from "lucide-react";
 
+import { SearchInput } from "@/components/ui/search-input";
 import { SortSelect } from "@/components/ui/sort-select";
 import { listHref, type QueryParams } from "@/lib/list-query";
 import { cn } from "@/lib/utils";
@@ -72,44 +72,25 @@ export function ListToolbar({
       {(searchPlaceholder || sortOptions) && (
         <div className="flex flex-wrap items-center gap-2">
           {searchPlaceholder && (
+            /*
+              The form is the no-JavaScript fallback — SearchInput debounces and
+              rewrites the URL itself, and swallows Enter before it gets here.
+            */
             <form action={basePath} role="search" className="flex min-w-0 flex-1 gap-2">
               {hiddenParams.map(([key, value]) => (
                 <input key={key} type="hidden" name={key} value={String(value)} />
               ))}
 
-              <div className="relative min-w-0 flex-1 sm:max-w-xs">
-                <label htmlFor={`${basePath}-search`} className="sr-only">
-                  Search
-                </label>
-                <Search
-                  className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-400"
-                  aria-hidden
-                />
-                <input
-                  id={`${basePath}-search`}
-                  name="q"
-                  type="search"
-                  defaultValue={params.q ? String(params.q) : ""}
-                  placeholder={searchPlaceholder}
-                  className="w-full rounded-lg border-0 bg-white py-2 pl-9 pr-3 text-sm text-ink-900 shadow-sm ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-brand-600"
-                />
-              </div>
+              <SearchInput placeholder={searchPlaceholder} />
 
-              <button
-                type="submit"
-                className="shrink-0 rounded-lg bg-brand-600 px-4 text-sm font-medium text-white transition-colors hover:bg-brand-700"
-              >
-                Search
-              </button>
-
-              {params.q && (
-                <Link
-                  href={listHref(basePath, params, { q: undefined })}
-                  className="shrink-0 self-center text-sm font-medium text-ink-500 hover:text-ink-900"
+              <noscript>
+                <button
+                  type="submit"
+                  className="shrink-0 rounded-lg bg-brand-600 px-4 text-sm font-medium text-white transition-colors hover:bg-brand-700"
                 >
-                  Clear
-                </Link>
-              )}
+                  Search
+                </button>
+              </noscript>
             </form>
           )}
 

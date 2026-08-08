@@ -6,41 +6,54 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 /**
- * Sidebar row for the customer portal.
+ * Sidebar row for the customer portal, styled to match {@link AdminNavLink}
+ * so both consoles read as one product.
  *
- * `/orders` must not light up while you are on `/orders/abc`'s sibling routes
- * only by prefix accident, so the match is exact-or-child-path.
+ * `icon` is a rendered element, not a component: the parent is a server
+ * component, and function references can't cross the RSC boundary.
  */
 export function PortalNavLink({
   href,
   icon,
   badge,
   children,
-  onNavigate,
+  siblings,
 }: {
   href: string;
   icon?: React.ReactNode;
   badge?: number;
   children: React.ReactNode;
-  onNavigate?: () => void;
+  /**
+   * Every href in the nav. Needed because prefix matching alone lights up two
+   * rows at once on nested routes: on /profile/addresses both "Profile" and
+   * "Addresses" match, so the most specific entry has to win.
+   */
+  siblings?: string[];
 }) {
   const pathname = usePathname();
-  const active = pathname === href || pathname.startsWith(`${href}/`);
+
+  const matches = (candidate: string) =>
+    pathname === candidate || pathname.startsWith(`${candidate}/`);
+
+  const bestMatch = (siblings ?? [href])
+    .filter(matches)
+    .sort((a, b) => b.length - a.length)[0];
+
+  const active = bestMatch === href;
 
   return (
     <Link
       href={href}
-      onClick={onNavigate}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+        "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
         active
-          ? "bg-brand-50 font-medium text-brand-700"
-          : "text-ink-600 hover:bg-slate-100 hover:text-ink-900"
+          ? "bg-brand-600 font-medium text-white"
+          : "text-slate-300 hover:bg-white/5 hover:text-white"
       )}
     >
       {icon && (
-        <span className={cn("shrink-0", active ? "text-brand-600" : "text-ink-400")}>
+        <span className="shrink-0" aria-hidden>
           {icon}
         </span>
       )}
@@ -49,7 +62,7 @@ export function PortalNavLink({
         <span
           className={cn(
             "grid min-w-5 shrink-0 place-items-center rounded-full px-1.5 text-xs font-semibold",
-            active ? "bg-brand-600 text-white" : "bg-slate-200 text-ink-700"
+            active ? "bg-white/20 text-white" : "bg-white/10 text-slate-200"
           )}
         >
           {badge}

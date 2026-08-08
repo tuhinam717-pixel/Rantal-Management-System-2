@@ -49,12 +49,12 @@ export function PortalMobileNav({ children }: { children: React.ReactNode }) {
             className="absolute inset-0 bg-ink-900/50"
           />
 
-          <div className="relative flex h-dvh w-72 flex-col overflow-y-auto bg-white">
+          <div className="relative flex h-dvh w-72 flex-col overflow-y-auto bg-ink-900">
             <button
               type="button"
               onClick={() => setOpen(false)}
               aria-label="Close navigation"
-              className="absolute right-3 top-3 grid size-8 place-items-center rounded-lg text-ink-500 hover:bg-slate-100 hover:text-ink-900"
+              className="absolute right-3 top-3 grid size-8 place-items-center rounded-lg text-slate-300 hover:bg-white/10 hover:text-white"
             >
               <X className="size-4" aria-hidden />
             </button>

@@ -5,13 +5,13 @@ import {
   LayoutDashboard,
   MapPin,
   ScrollText,
-  Search,
   ShoppingCart,
   Store,
   UserRound,
 } from "lucide-react";
 
 import { AppImage } from "@/components/ui/app-image";
+import { CatalogueSearch } from "@/components/layout/catalogue-search";
 import { Logo } from "@/components/ui/logo";
 import { PortalMobileNav } from "@/components/layout/portal-mobile-nav";
 import { PortalNavLink } from "@/components/layout/portal-nav-link";
@@ -53,17 +53,19 @@ export default async function PortalLayout({
     },
   ];
 
+  const allHrefs = groups.flatMap((group) => group.items.map((i) => i.href));
+
   // Rendered once, used by both the fixed rail and the mobile drawer.
   const nav = (
     <>
-      <div className="flex h-16 items-center border-b border-slate-200 px-5">
+      <div className="flex h-16 items-center border-b border-white/10 px-5">
         <Link href="/dashboard">
-          <Logo />
+          <Logo inverted />
         </Link>
       </div>
 
-      <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-4">
-        <span className="relative size-10 shrink-0 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200">
+      <div className="flex items-center gap-3 border-b border-white/10 px-5 py-4">
+        <span className="relative size-10 shrink-0 overflow-hidden rounded-full bg-white/10 ring-1 ring-white/15">
           {user.imageUrl ? (
             <AppImage
               src={user.imageUrl}
@@ -79,10 +81,10 @@ export default async function PortalLayout({
           )}
         </span>
         <span className="min-w-0">
-          <span className="block truncate text-sm font-medium text-ink-900">
+          <span className="block truncate text-sm font-medium text-white">
             {user.name}
           </span>
-          <span className="block truncate text-xs text-ink-500">
+          <span className="block truncate text-xs text-slate-400">
             {user.email}
           </span>
         </span>
@@ -91,7 +93,7 @@ export default async function PortalLayout({
       <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-5">
         {groups.map((group) => (
           <div key={group.label}>
-            <p className="px-2 pb-2 text-xs font-medium uppercase tracking-wide text-ink-400">
+            <p className="px-2 pb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
               {group.label}
             </p>
             <div className="space-y-0.5">
@@ -101,6 +103,7 @@ export default async function PortalLayout({
                   href={item.href}
                   icon={<item.icon className="size-4" />}
                   badge={"badge" in item ? item.badge : undefined}
+                  siblings={allHrefs}
                 >
                   {item.label}
                 </PortalNavLink>
@@ -110,15 +113,15 @@ export default async function PortalLayout({
         ))}
       </nav>
 
-      <div className="border-t border-slate-200 p-3">
+      <div className="border-t border-white/10 p-3">
         <SignOutButton />
       </div>
     </>
   );
 
   return (
-    <div className="min-h-dvh bg-slate-50 lg:flex">
-      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-slate-200 bg-white lg:flex">
+    <div className="min-h-dvh bg-slate-100 lg:flex">
+      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col bg-ink-900 lg:flex">
         {nav}
       </aside>
 
@@ -137,28 +140,7 @@ export default async function PortalLayout({
               <Logo />
             </Link>
 
-            <form
-              action="/products"
-              role="search"
-              className="hidden min-w-0 max-w-sm flex-1 sm:block"
-            >
-              <label htmlFor="portal-search" className="sr-only">
-                Search rentals
-              </label>
-              <div className="relative">
-                <Search
-                  className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-400"
-                  aria-hidden
-                />
-                <input
-                  id="portal-search"
-                  name="q"
-                  type="search"
-                  placeholder="Search rentals…"
-                  className="w-full rounded-lg border-0 bg-slate-50 py-2 pl-9 pr-3 text-sm text-ink-900 ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-inset focus:ring-brand-600"
-                />
-              </div>
-            </form>
+            <CatalogueSearch />
           </div>
 
           <div className="flex shrink-0 items-center gap-1">
