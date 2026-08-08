@@ -1,12 +1,12 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
-import { ImageOff, Save } from "lucide-react";
+import { Save } from "lucide-react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { ImageUpload } from "@/components/ui/image-upload";
 import { Input } from "@/components/ui/input";
 import { AffixInput, Select, Textarea } from "@/components/ui/field";
 import { FieldRow, FormActions, FormSection } from "@/components/ui/form-shell";
@@ -56,8 +56,6 @@ export function ProductForm({
     initial?.depositType ?? "FIXED"
   );
   const [depositValue, setDepositValue] = useState(initial?.depositValue ?? 0);
-  const [imageUrl, setImageUrl] = useState(initial?.imageUrl ?? "");
-  const [imageOk, setImageOk] = useState(true);
 
   return (
     <form action={formAction} className="space-y-5 pb-4">
@@ -115,45 +113,15 @@ export function ProductForm({
       <FormSection
         step={2}
         title="Image"
-        description="Paste a link to a photo. The preview updates as you type."
+        description="Upload a photo from this device, or paste a link."
       >
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-          <div className="relative aspect-4/3 w-40 shrink-0 overflow-hidden rounded-xl bg-brand-50 ring-1 ring-line">
-            {imageUrl && imageOk ? (
-              <Image
-                src={imageUrl}
-                alt=""
-                fill
-                sizes="160px"
-                className="object-cover"
-                onError={() => setImageOk(false)}
-              />
-            ) : (
-              <span className="grid size-full place-items-center text-brand-400">
-                <ImageOff className="size-7" aria-hidden />
-              </span>
-            )}
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <Input
-              label="Image URL"
-              name="imageUrl"
-              type="url"
-              value={imageUrl}
-              onChange={(e) => {
-                setImageUrl(e.target.value);
-                setImageOk(true);
-              }}
-              placeholder="https://images.unsplash.com/..."
-              hint={
-                imageUrl && !imageOk
-                  ? "That image could not be loaded — check the URL and that the host is allowed in next.config.ts."
-                  : "Must be an https URL on an allowed host."
-              }
-            />
-          </div>
-        </div>
+        <ImageUpload
+          name="imageUrl"
+          defaultValue={initial?.imageUrl ?? ""}
+          label="Product photo"
+          maxDimension={1000}
+          hint="Shown on the catalogue card and product page."
+        />
       </FormSection>
 
       <FormSection

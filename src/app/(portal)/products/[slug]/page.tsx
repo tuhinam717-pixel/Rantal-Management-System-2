@@ -1,9 +1,9 @@
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { ChevronLeft, ImageOff } from "lucide-react";
 
+import { AppImage } from "@/components/ui/app-image";
 import { RentalConfigurator } from "@/components/products/rental-configurator";
 import { getProductBySlug } from "@/server/services/catalog";
 import { formatCurrency } from "@/lib/utils";
@@ -52,7 +52,7 @@ export default async function ProductDetailPage({
         <div className="space-y-5">
           <div className="relative aspect-4/3 overflow-hidden rounded-xl bg-slate-100">
             {product.imageUrl ? (
-              <Image
+              <AppImage
                 src={product.imageUrl}
                 alt={product.name}
                 fill

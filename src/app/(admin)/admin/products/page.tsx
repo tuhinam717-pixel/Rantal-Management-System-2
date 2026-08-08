@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { Boxes, ImageOff, Pencil } from "lucide-react";
 
+import { AppImage } from "@/components/ui/app-image";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -12,10 +12,12 @@ import {
   EmptyState,
   TableRow,
 } from "@/components/ui/data-table";
+import { ListToolbar } from "@/components/ui/list-toolbar";
 import { PageHeader } from "@/components/ui/page-header";
 import { Pagination } from "@/components/ui/pagination";
 import { ViewToggle } from "@/components/ui/view-toggle";
 import { pageMeta, resolvePage } from "@/lib/pagination";
+import { resolveSort, textSearch, type SortOption } from "@/lib/list-query";
 import { resolveView } from "@/lib/view-mode";
 import { DeleteButton } from "@/components/admin/delete-button";
 import { NewProductDialog } from "@/components/admin/new-product-dialog";
@@ -23,8 +25,18 @@ import { deleteProductAction } from "./actions";
 import { requireRole } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma";
 import { cn, formatCurrency } from "@/lib/utils";
+import type { Prisma } from "@prisma/client";
 
 export const metadata: Metadata = { title: "Products" };
+
+const SORTS: SortOption<Prisma.ProductOrderByWithRelationInput>[] = [
+  { value: "name", label: "Name A–Z", orderBy: { name: "asc" } },
+  { value: "name-desc", label: "Name Z–A", orderBy: { name: "desc" } },
+  { value: "newest", label: "Newest first", orderBy: { createdAt: "desc" } },
+  { value: "stock", label: "Most stock", orderBy: { totalStock: "desc" } },
+  { value: "stock-asc", label: "Least stock", orderBy: { totalStock: "asc" } },
+  { value: "popular", label: "Most rented", orderBy: { orderLines: { _count: "desc" } } },
+];
 
 const COLUMNS = [
   { key: "product", label: "Product" },
@@ -39,16 +51,36 @@ const COLUMNS = [
 export default async function AdminProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; page?: string }>;
+  searchParams: Promise<{
+    view?: string;
+    page?: string;
+    q?: string;
+    sort?: string;
+    category?: string;
+    stock?: string;
+  }>;
 }) {
   await requireRole("ADMIN");
-  const { view: rawView, page } = await searchParams;
+  const { view: rawView, page, q, sort, category, stock } = await searchParams;
   const view = resolveView(rawView);
   const pageInfo = resolvePage(page);
+  const activeSort = resolveSort(sort, SORTS);
+
+  const search = textSearch(q, ["name", "sku", "description"]);
+
+  const where: Prisma.ProductWhereInput = {
+    ...(category ? { category: { slug: category } } : {}),
+    ...(stock === "out" ? { totalStock: { lte: 0 } } : {}),
+    ...(stock === "repair" ? { underRepairStock: { gt: 0 } } : {}),
+    ...(stock === "rentable" ? { isRentable: true } : {}),
+    ...(stock === "hidden" ? { isRentable: false } : {}),
+    ...(search ? { OR: search } : {}),
+  };
 
   const [products, total, categories, periods] = await Promise.all([
     prisma.product.findMany({
-      orderBy: { name: "asc" },
+      where,
+      orderBy: activeSort.orderBy,
       skip: pageInfo.skip,
       take: pageInfo.take,
       include: {
@@ -57,7 +89,7 @@ export default async function AdminProductsPage({
         _count: { select: { orderLines: true } },
       },
     }),
-    prisma.product.count(),
+    prisma.product.count({ where }),
     prisma.category.findMany({ orderBy: { name: "asc" } }),
     prisma.rentalPeriod.findMany({
       where: { isActive: true },
@@ -66,6 +98,8 @@ export default async function AdminProductsPage({
   ]);
 
   const meta = pageMeta(pageInfo, total);
+  const listParams = { view: rawView, q, sort, category, stock };
+  const filtered = Boolean(q || category || stock);
 
   const periodOptions = periods.map((p) => ({
     id: p.id,
@@ -97,13 +131,47 @@ export default async function AdminProductsPage({
         }
       />
 
+      <ListToolbar
+        basePath="/admin/products"
+        params={listParams}
+        searchPlaceholder="Search name, SKU or description…"
+        sortOptions={SORTS.map(({ value, label }) => ({ value, label }))}
+        filters={[
+          {
+            key: "category",
+            label: "Category",
+            options: [
+              { value: undefined, label: "All" },
+              ...categories.map((c) => ({ value: c.slug, label: c.name })),
+            ],
+          },
+          {
+            key: "stock",
+            label: "Stock",
+            options: [
+              { value: undefined, label: "Any" },
+              { value: "rentable", label: "Rentable" },
+              { value: "hidden", label: "Hidden" },
+              { value: "out", label: "Out of stock" },
+              { value: "repair", label: "In repair" },
+            ],
+          },
+        ]}
+      />
+
       {products.length === 0 ? (
         <EmptyState
           icon={Boxes}
-          title="No products yet"
-          description="Add your first rentable product to start taking bookings."
+          title={filtered ? "No products match" : "No products yet"}
+          description={
+            filtered
+              ? "Try a different search term, category or stock filter."
+              : "Add your first rentable product to start taking bookings."
+          }
           action={
-            <NewProductDialog categories={categories} periods={periodOptions} />
+            filtered ? undefined : (
+              <NewProductDialog categories={categories} periods={periodOptions} />
+            )
           }
         />
       ) : view === "cards" ? (
@@ -125,7 +193,7 @@ export default async function AdminProductsPage({
               >
                 <div className="relative aspect-4/3 bg-brand-50">
                   {product.imageUrl ? (
-                    <Image
+                    <AppImage
                       src={product.imageUrl}
                       alt=""
                       fill
@@ -220,7 +288,7 @@ export default async function AdminProductsPage({
                   <div className="flex items-center gap-3">
                     <div className="relative size-10 shrink-0 overflow-hidden rounded-lg bg-brand-50">
                       {product.imageUrl ? (
-                        <Image
+                        <AppImage
                           src={product.imageUrl}
                           alt=""
                           fill
@@ -285,7 +353,7 @@ export default async function AdminProductsPage({
       <Pagination
         meta={meta}
         basePath="/admin/products"
-        params={{ view: view === "cards" ? "cards" : undefined }}
+        params={listParams}
         label="products"
       />
     </div>

@@ -1,21 +1,35 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import { ProductCard } from "@/components/products/product-card";
+import { ListToolbar } from "@/components/ui/list-toolbar";
 import { Pagination } from "@/components/ui/pagination";
+import { resolveSort, type SortOption } from "@/lib/list-query";
+import type { Prisma } from "@prisma/client";
 import { getCategories, listProducts } from "@/server/services/catalog";
 import { pageMeta, resolvePage } from "@/lib/pagination";
-import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Browse rentals" };
+
+const SORTS: SortOption<Prisma.ProductOrderByWithRelationInput>[] = [
+  { value: "name", label: "Name A–Z", orderBy: { name: "asc" } },
+  { value: "name-desc", label: "Name Z–A", orderBy: { name: "desc" } },
+  { value: "newest", label: "Newest first", orderBy: { createdAt: "desc" } },
+  { value: "popular", label: "Most rented", orderBy: { orderLines: { _count: "desc" } } },
+];
 
 export default async function ProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ category?: string; q?: string; page?: string }>;
+  searchParams: Promise<{
+    category?: string;
+    q?: string;
+    page?: string;
+    sort?: string;
+  }>;
 }) {
-  const { category, q, page } = await searchParams;
+  const { category, q, page, sort } = await searchParams;
   const pageInfo = resolvePage(page, 12);
+  const activeSort = resolveSort(sort, SORTS);
 
   const [{ items: products, total }, categories] = await Promise.all([
     listProducts({
@@ -23,13 +37,13 @@ export default async function ProductsPage({
       search: q,
       skip: pageInfo.skip,
       take: pageInfo.take,
+      orderBy: activeSort.orderBy,
     }),
     getCategories(),
   ]);
 
   const meta = pageMeta(pageInfo, total);
-
-  const filters = [{ slug: undefined, name: "All" }, ...categories];
+  const listParams = { category, q, sort };
 
   return (
     <div className="space-y-6">
@@ -42,43 +56,21 @@ export default async function ProductsPage({
         </p>
       </div>
 
-      <form className="flex gap-2" action="/products">
-        {category && <input type="hidden" name="category" value={category} />}
-        <input
-          name="q"
-          defaultValue={q}
-          placeholder="Search by name or SKU…"
-          className="w-full max-w-sm rounded-lg border-0 bg-white py-2.5 pl-3.5 text-sm text-ink-900 shadow-sm ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-brand-600"
-        />
-        <button
-          type="submit"
-          className="rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700"
-        >
-          Search
-        </button>
-      </form>
-
-      <div className="flex flex-wrap gap-2">
-        {filters.map((filter) => {
-          const active = category === filter.slug;
-          const href = filter.slug ? `/products?category=${filter.slug}` : "/products";
-
-          return (
-            <Link
-              key={filter.name}
-              href={href}
-              className={cn(
-                "rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors",
-                active
-                  ? "bg-brand-600 text-white"
-                  : "bg-white text-ink-700 ring-1 ring-inset ring-slate-200 hover:bg-slate-50"
-              )}
-            >
-              {filter.name}
-            </Link>
-          );
-        })}
-      </div>
+      <ListToolbar
+        basePath="/products"
+        params={listParams}
+        searchPlaceholder="Search by name or SKU…"
+        sortOptions={SORTS.map(({ value, label }) => ({ value, label }))}
+        filters={[
+          {
+            key: "category",
+            options: [
+              { value: undefined, label: "All" },
+              ...categories.map((c) => ({ value: c.slug, label: c.name })),
+            ],
+          },
+        ]}
+      />
 
       {products.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
@@ -97,7 +89,7 @@ export default async function ProductsPage({
           <Pagination
             meta={meta}
             basePath="/products"
-            params={{ category, q }}
+            params={listParams}
             label="products"
           />
         </>

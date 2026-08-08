@@ -8,7 +8,10 @@ import { Pagination } from "@/components/ui/pagination";
 import { ViewToggle } from "@/components/ui/view-toggle";
 import { DataTable, EmptyState, TableRow } from "@/components/ui/data-table";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
+import { ListToolbar } from "@/components/ui/list-toolbar";
 import { pageMeta, resolvePage } from "@/lib/pagination";
+import { resolveSort, textSearch, type SortOption } from "@/lib/list-query";
+import type { Prisma } from "@prisma/client";
 import { resolveView } from "@/lib/view-mode";
 import { DateRange } from "@/components/ui/date-range";
 import { DeleteButton } from "@/components/admin/delete-button";
@@ -26,6 +29,14 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import type { RentalUnit } from "@/types";
 
 export const metadata: Metadata = { title: "Quotations" };
+
+const SORTS: SortOption<Prisma.QuotationOrderByWithRelationInput>[] = [
+  { value: "newest", label: "Newest first", orderBy: { createdAt: "desc" } },
+  { value: "oldest", label: "Oldest first", orderBy: { createdAt: "asc" } },
+  { value: "value", label: "Highest value", orderBy: { total: "desc" } },
+  { value: "value-asc", label: "Lowest value", orderBy: { total: "asc" } },
+  { value: "number", label: "Quote number", orderBy: { number: "asc" } },
+];
 
 const STATUS_TONE: Record<string, BadgeTone> = {
   DRAFT: "neutral",
@@ -47,18 +58,37 @@ const COLUMNS = [
 export default async function AdminQuotationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; page?: string }>;
+  searchParams: Promise<{
+    view?: string;
+    page?: string;
+    q?: string;
+    sort?: string;
+    status?: string;
+  }>;
 }) {
   await requireRole("ADMIN");
-  const { view: rawView, page } = await searchParams;
+  const { view: rawView, page, q, sort, status } = await searchParams;
   const view = resolveView(rawView);
   const pageInfo = resolvePage(page);
+  const activeSort = resolveSort(sort, SORTS);
+
+  const search = textSearch(q, [
+    "number",
+    "customer.name",
+    "customer.email",
+  ]);
+
+  const where: Prisma.QuotationWhereInput = {
+    ...(status ? { status: status as Prisma.EnumQuotationStatusFilter["equals"] } : {}),
+    ...(search ? { OR: search } : {}),
+  };
 
   const pricelistId = await getActivePricelistId();
 
   const [quotations, total, customers, products, periods] = await Promise.all([
     prisma.quotation.findMany({
-      orderBy: { createdAt: "desc" },
+      where,
+      orderBy: activeSort.orderBy,
       skip: pageInfo.skip,
       take: pageInfo.take,
       include: {
@@ -68,7 +98,7 @@ export default async function AdminQuotationsPage({
         template: { select: { paymentTermsPercent: true } },
       },
     }),
-    prisma.quotation.count(),
+    prisma.quotation.count({ where }),
     prisma.user.findMany({
       where: { role: "CUSTOMER", isActive: true },
       orderBy: { name: "asc" },
@@ -83,6 +113,8 @@ export default async function AdminQuotationsPage({
   ]);
 
   const meta = pageMeta(pageInfo, total);
+  const listParams = { view: rawView, q, sort, status };
+  const filtered = Boolean(q || status);
 
   return (
     <div className="space-y-6">
@@ -118,11 +150,35 @@ export default async function AdminQuotationsPage({
         }
       />
 
-      {total === 0 ? (
+      <ListToolbar
+        basePath="/admin/quotations"
+        params={listParams}
+        searchPlaceholder="Search quote no. or customer…"
+        sortOptions={SORTS.map(({ value, label }) => ({ value, label }))}
+        filters={[
+          {
+            key: "status",
+            label: "Status",
+            options: [
+              { value: undefined, label: "All" },
+              { value: "DRAFT", label: "Draft" },
+              { value: "SENT", label: "Sent" },
+              { value: "CONFIRMED", label: "Confirmed" },
+              { value: "CANCELLED", label: "Cancelled" },
+            ],
+          },
+        ]}
+      />
+
+      {quotations.length === 0 ? (
         <EmptyState
           icon={FileText}
-          title="No quotations yet"
-          description="Build one for a walk-in customer, then confirm it into a rental order."
+          title={filtered ? "No quotations match" : "No quotations yet"}
+          description={
+            filtered
+              ? "Try a different search term or status."
+              : "Build one for a walk-in customer, then confirm it into a rental order."
+          }
         />
       ) : view === "table" ? (
         <DataTable columns={COLUMNS} minWidth="60rem">
@@ -275,7 +331,7 @@ export default async function AdminQuotationsPage({
       <Pagination
         meta={meta}
         basePath="/admin/quotations"
-        params={{ view: view === "cards" ? "cards" : undefined }}
+        params={listParams}
         label="quotations"
       />
     </div>

@@ -10,9 +10,12 @@ import {
   EmptyState,
   TableRow,
 } from "@/components/ui/data-table";
+import { ListToolbar } from "@/components/ui/list-toolbar";
 import { PageHeader } from "@/components/ui/page-header";
 import { Pagination } from "@/components/ui/pagination";
 import { pageMeta, resolvePage } from "@/lib/pagination";
+import { resolveSort, textSearch, type SortOption } from "@/lib/list-query";
+import type { Prisma } from "@prisma/client";
 import { DeleteButton } from "@/components/admin/delete-button";
 import { LateFeeRuleDialog } from "@/components/admin/late-fee-rule-form";
 import { deleteLateFeeRuleAction } from "@/app/(admin)/admin/config-actions";
@@ -21,6 +24,13 @@ import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Late fees" };
+
+const SORTS: SortOption<Prisma.LateFeeOrderByWithRelationInput>[] = [
+  { value: "newest", label: "Newest first", orderBy: { calculatedAt: "desc" } },
+  { value: "oldest", label: "Oldest first", orderBy: { calculatedAt: "asc" } },
+  { value: "amount", label: "Highest amount", orderBy: { amount: "desc" } },
+  { value: "amount-asc", label: "Lowest amount", orderBy: { amount: "asc" } },
+];
 
 const STATUS_TONE: Record<string, BadgeTone> = {
   CALCULATED: "warning",
@@ -42,15 +52,30 @@ const COLUMNS = [
 export default async function AdminLateFeesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{
+    page?: string;
+    q?: string;
+    sort?: string;
+    status?: string;
+  }>;
 }) {
   await requireRole("ADMIN");
-  const pageInfo = resolvePage((await searchParams).page);
+  const { page, q, sort, status } = await searchParams;
+  const pageInfo = resolvePage(page);
+  const activeSort = resolveSort(sort, SORTS);
+
+  const search = textSearch(q, ["order.number", "order.customer.name"]);
+
+  const where: Prisma.LateFeeWhereInput = {
+    ...(status ? { status: status as Prisma.EnumLateFeeStatusFilter["equals"] } : {}),
+    ...(search ? { OR: search } : {}),
+  };
 
   const [rules, fees, feeCount, charged] = await Promise.all([
     prisma.lateFeeRule.findMany({ orderBy: { createdAt: "asc" } }),
     prisma.lateFee.findMany({
-      orderBy: { calculatedAt: "desc" },
+      where,
+      orderBy: activeSort.orderBy,
       skip: pageInfo.skip,
       take: pageInfo.take,
       include: {
@@ -58,12 +83,13 @@ export default async function AdminLateFeesPage({
         rule: true,
       },
     }),
-    prisma.lateFee.count(),
+    prisma.lateFee.count({ where }),
     // Sum across all charges, not just the page being viewed.
     prisma.lateFee.aggregate({ _sum: { amount: true } }),
   ]);
 
   const meta = pageMeta(pageInfo, feeCount);
+  const listParams = { q, sort, status };
   const total = Number(charged._sum.amount ?? 0);
 
   return (
@@ -165,11 +191,36 @@ export default async function AdminLateFeesPage({
       <section className="space-y-4">
         <h2 className="text-sm font-semibold text-ink-900">Charges raised</h2>
 
-        {feeCount === 0 ? (
+        <ListToolbar
+          basePath="/admin/late-fees"
+          params={listParams}
+          searchPlaceholder="Search order no. or customer…"
+          sortOptions={SORTS.map(({ value, label }) => ({ value, label }))}
+          filters={[
+            {
+              key: "status",
+              label: "Status",
+              options: [
+                { value: undefined, label: "All" },
+                { value: "CALCULATED", label: "Calculated" },
+                { value: "DEDUCTED_FROM_DEPOSIT", label: "Deducted" },
+                { value: "INVOICED", label: "Invoiced" },
+                { value: "PAID", label: "Paid" },
+                { value: "WAIVED", label: "Waived" },
+              ],
+            },
+          ]}
+        />
+
+        {fees.length === 0 ? (
           <EmptyState
             icon={ShieldAlert}
-            title="No late fees charged yet"
-            description="Penalties appear here once an overdue rental is settled."
+            title={q || status ? "No charges match" : "No late fees charged yet"}
+            description={
+              q || status
+                ? "Try a different search term or status."
+                : "Penalties appear here once an overdue rental is settled."
+            }
           />
         ) : (
           <DataTable columns={COLUMNS} minWidth="42rem">
@@ -201,7 +252,12 @@ export default async function AdminLateFeesPage({
           </DataTable>
         )}
 
-        <Pagination meta={meta} basePath="/admin/late-fees" label="charges" />
+        <Pagination
+          meta={meta}
+          basePath="/admin/late-fees"
+          params={listParams}
+          label="charges"
+        />
       </section>
     </div>
   );

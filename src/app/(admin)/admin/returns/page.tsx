@@ -13,7 +13,10 @@ import {
 } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { Pagination } from "@/components/ui/pagination";
+import { ListToolbar } from "@/components/ui/list-toolbar";
 import { ViewToggle } from "@/components/ui/view-toggle";
+import { resolveSort, textSearch, type SortOption } from "@/lib/list-query";
+import type { Prisma } from "@prisma/client";
 import { ReturnForm } from "@/components/pickup-return/return-form";
 import { detectOverdueAction } from "@/app/(admin)/admin/actions";
 import { requireRole } from "@/lib/auth/current-user";
@@ -24,6 +27,13 @@ import { resolveView } from "@/lib/view-mode";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Returns" };
+
+const SORTS: SortOption<Prisma.ReturnOrderByWithRelationInput>[] = [
+  { value: "due", label: "Due soonest", orderBy: { scheduledFor: "asc" } },
+  { value: "due-desc", label: "Due latest", orderBy: { scheduledFor: "desc" } },
+  { value: "order", label: "Order number", orderBy: { order: { number: "asc" } } },
+  { value: "customer", label: "Customer A–Z", orderBy: { order: { customer: { name: "asc" } } } },
+];
 
 const COLUMNS = [
   { key: "order", label: "Order" },
@@ -38,20 +48,38 @@ const COLUMNS = [
 export default async function AdminReturnsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; page?: string }>;
+  searchParams: Promise<{
+    view?: string;
+    page?: string;
+    q?: string;
+    sort?: string;
+    status?: string;
+    due?: string;
+  }>;
 }) {
   await requireRole("ADMIN");
-  const { view: rawView, page } = await searchParams;
+  const { view: rawView, page, q, sort, status, due } = await searchParams;
   const view = resolveView(rawView);
   const pageInfo = resolvePage(page);
+  const activeSort = resolveSort(sort, SORTS);
   const now = new Date();
 
-  const where = { status: { not: "COMPLETED" as const } };
+  const search = textSearch(q, ["order.number", "order.customer.name"]);
+
+  const where: Prisma.ReturnWhereInput = {
+    // The queue is about outstanding work, so completed returns stay hidden
+    // unless the status filter asks for them explicitly.
+    ...(status
+      ? { status: status as Prisma.EnumReturnStatusFilter["equals"] }
+      : { status: { not: "COMPLETED" } }),
+    ...(due === "overdue" ? { scheduledFor: { lt: now } } : {}),
+    ...(search ? { OR: search } : {}),
+  };
 
   const [returns, total, overdueCount, rule] = await Promise.all([
     prisma.return.findMany({
       where,
-      orderBy: { scheduledFor: "asc" },
+      orderBy: activeSort.orderBy,
       skip: pageInfo.skip,
       take: pageInfo.take,
       include: {
@@ -70,6 +98,8 @@ export default async function AdminReturnsPage({
   ]);
 
   const meta = pageMeta(pageInfo, total);
+  const listParams = { view: rawView, q, sort, status, due };
+  const filtered = Boolean(q || status || due);
 
   /** Preview only — processReturn recomputes this at settlement. */
   const penaltyFor = (dueAt: Date) =>
@@ -102,11 +132,44 @@ export default async function AdminReturnsPage({
         }
       />
 
-      {total === 0 ? (
+      <ListToolbar
+        basePath="/admin/returns"
+        params={listParams}
+        searchPlaceholder="Search order no. or customer…"
+        sortOptions={SORTS.map(({ value, label }) => ({ value, label }))}
+        filters={[
+          {
+            key: "status",
+            label: "Status",
+            options: [
+              { value: undefined, label: "Outstanding" },
+              { value: "SCHEDULED", label: "Scheduled" },
+              { value: "RECEIVED", label: "Received" },
+              { value: "INSPECTED", label: "Inspected" },
+              { value: "MISSED", label: "Missed" },
+              { value: "COMPLETED", label: "Completed" },
+            ],
+          },
+          {
+            key: "due",
+            label: "Due",
+            options: [
+              { value: undefined, label: "Any" },
+              { value: "overdue", label: "Past due" },
+            ],
+          },
+        ]}
+      />
+
+      {returns.length === 0 ? (
         <EmptyState
           icon={Undo2}
-          title="Nothing waiting to come back"
-          description="Every rental has been returned and settled."
+          title={filtered ? "No returns match" : "Nothing waiting to come back"}
+          description={
+            filtered
+              ? "Try a different search term, status or due filter."
+              : "Every rental has been returned and settled."
+          }
         />
       ) : view === "cards" ? (
         <CardGrid>
@@ -258,7 +321,7 @@ export default async function AdminReturnsPage({
       <Pagination
         meta={meta}
         basePath="/admin/returns"
-        params={{ view: view === "cards" ? "cards" : undefined }}
+        params={listParams}
         label="returns"
       />
     </div>

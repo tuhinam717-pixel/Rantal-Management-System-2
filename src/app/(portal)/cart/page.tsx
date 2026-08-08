@@ -1,8 +1,8 @@
-import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { ArrowRight, ImageOff, Trash2 } from "lucide-react";
 
+import { AppImage } from "@/components/ui/app-image";
 import { Button } from "@/components/ui/button";
 import { DateRange } from "@/components/ui/date-range";
 import { removeItemAction, updateQuantityAction } from "./actions";
@@ -51,7 +51,7 @@ export default async function CartPage() {
             >
               <div className="relative size-24 shrink-0 overflow-hidden rounded-lg bg-slate-100">
                 {item.product.imageUrl ? (
-                  <Image
+                  <AppImage
                     src={item.product.imageUrl}
                     alt={item.product.name}
                     fill

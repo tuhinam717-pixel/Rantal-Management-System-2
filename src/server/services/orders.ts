@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { FulfilmentMethod } from "@prisma/client";
+import type { FulfilmentMethod, Prisma } from "@prisma/client";
 
 import { LONG_TRANSACTION, prisma } from "@/lib/prisma";
 import { round2 } from "@/lib/rental/pricing";
@@ -175,14 +175,83 @@ export async function checkout(userId: string, input: CheckoutInput) {
   }, LONG_TRANSACTION);
 }
 
+/**
+ * Statuses behind the "Active" chip on the portal. A customer thinks of a
+ * rental as active from the moment it is confirmed until it comes back, so the
+ * chip spans the whole in-flight range rather than the ACTIVE status alone.
+ */
+export const CUSTOMER_ACTIVE_STATUSES = [
+  "CONFIRMED",
+  "READY_FOR_PICKUP",
+  "PICKED_UP",
+  "ACTIVE",
+  "RETURN_DUE",
+] as const;
+
+export type CustomerOrderFilter =
+  | "active"
+  | "overdue"
+  | "completed"
+  | "cancelled";
+
+/**
+ * Typed as a WhereInput rather than inferred: a union of literal shapes would
+ * widen the composed `where` and cost `findMany` its `include` inference.
+ */
+function customerStatusWhere(filter?: string): Prisma.RentalOrderWhereInput {
+  switch (filter) {
+    case "active":
+      return { status: { in: [...CUSTOMER_ACTIVE_STATUSES] } };
+    case "overdue":
+      return { status: "OVERDUE" };
+    case "completed":
+      return { status: { in: ["RETURNED", "COMPLETED"] } };
+    case "cancelled":
+      return { status: "CANCELLED" };
+    default:
+      return {};
+  }
+}
+
 export async function listOrdersForCustomer(
   userId: string,
-  options?: { skip?: number; take?: number }
+  options?: {
+    skip?: number;
+    take?: number;
+    status?: string;
+    search?: string;
+    orderBy?: Prisma.RentalOrderOrderByWithRelationInput;
+  }
 ) {
+  const search = options?.search?.trim();
+
+  const where: Prisma.RentalOrderWhereInput = {
+    customerId: userId,
+    ...customerStatusWhere(options?.status),
+    // Customers look an order up either by the number on their invoice or by
+    // the thing they rented, so both are searched.
+    ...(search
+      ? {
+          OR: [
+            { number: { contains: search, mode: "insensitive" as const } },
+            {
+              lines: {
+                some: {
+                  product: {
+                    name: { contains: search, mode: "insensitive" as const },
+                  },
+                },
+              },
+            },
+          ],
+        }
+      : {}),
+  };
+
   const [items, total] = await Promise.all([
     prisma.rentalOrder.findMany({
-      where: { customerId: userId },
-      orderBy: { createdAt: "desc" },
+      where,
+      orderBy: options?.orderBy ?? { createdAt: "desc" },
       skip: options?.skip,
       take: options?.take,
       include: {
@@ -190,7 +259,7 @@ export async function listOrdersForCustomer(
         deposit: true,
       },
     }),
-    prisma.rentalOrder.count({ where: { customerId: userId } }),
+    prisma.rentalOrder.count({ where }),
   ]);
 
   return { items, total };

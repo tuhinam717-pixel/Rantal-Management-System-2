@@ -1,11 +1,10 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import Image from "next/image";
-import { UserRound } from "lucide-react";
+import { useActionState } from "react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { ImageUpload } from "@/components/ui/image-upload";
 import { Input } from "@/components/ui/input";
 import {
   updateProfileAction,
@@ -21,44 +20,20 @@ export function ProfileForm({
     updateProfileAction,
     {}
   );
-  const [imageUrl, setImageUrl] = useState(initial.imageUrl);
 
   return (
     <form action={formAction} className="space-y-5">
       {state.error && <Alert tone="error">{state.error}</Alert>}
       {state.ok && <Alert tone="success">Profile updated.</Alert>}
 
-      <div className="flex items-center gap-4">
-        <div className="relative size-20 shrink-0 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200">
-          {imageUrl ? (
-            <Image
-              src={imageUrl}
-              alt=""
-              fill
-              sizes="80px"
-              className="object-cover"
-              // A bad URL shouldn't leave a broken image box behind.
-              onError={() => setImageUrl("")}
-            />
-          ) : (
-            <span className="grid size-full place-items-center text-slate-400">
-              <UserRound className="size-8" aria-hidden />
-            </span>
-          )}
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <Input
-            label="Profile photo URL"
-            name="imageUrl"
-            type="url"
-            value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
-            placeholder="https://..."
-            hint="Paste a link to your photo. The preview updates as you type."
-          />
-        </div>
-      </div>
+      <ImageUpload
+        name="imageUrl"
+        defaultValue={initial.imageUrl}
+        label="Profile photo"
+        shape="circle"
+        maxDimension={512}
+        hint="Pick a photo from your device — it is resized before saving."
+      />
 
       <Input label="Full name" name="name" defaultValue={initial.name} required />
 

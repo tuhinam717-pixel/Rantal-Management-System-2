@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { PlayCircle, Wrench } from "lucide-react";
 
@@ -14,7 +13,9 @@ import {
 } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { Pagination } from "@/components/ui/pagination";
+import { ListToolbar } from "@/components/ui/list-toolbar";
 import { ViewToggle } from "@/components/ui/view-toggle";
+import { resolveSort, textSearch, type SortOption } from "@/lib/list-query";
 import {
   CloseRepairDialog,
   OpenRepairDialog,
@@ -24,9 +25,16 @@ import { requireRole } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma";
 import { pageMeta, resolvePage } from "@/lib/pagination";
 import { resolveView } from "@/lib/view-mode";
-import { cn, formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Repairs" };
+
+const SORTS: SortOption<Prisma.RepairJobOrderByWithRelationInput>[] = [
+  { value: "newest", label: "Newest first", orderBy: { openedAt: "desc" } },
+  { value: "oldest", label: "Oldest first", orderBy: { openedAt: "asc" } },
+  { value: "product", label: "Product A–Z", orderBy: { product: { name: "asc" } } },
+  { value: "units", label: "Most units", orderBy: { quantity: "desc" } },
+];
 
 const STATUS_TONE: Record<string, BadgeTone> = {
   PENDING: "warning",
@@ -48,22 +56,34 @@ const COLUMNS = [
 export default async function AdminRepairsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; page?: string; status?: string }>;
+  searchParams: Promise<{
+    view?: string;
+    page?: string;
+    status?: string;
+    q?: string;
+    sort?: string;
+  }>;
 }) {
   await requireRole("ADMIN");
-  const { view: rawView, page, status } = await searchParams;
+  const { view: rawView, page, status, q, sort } = await searchParams;
   const view = resolveView(rawView);
   const pageInfo = resolvePage(page);
+  const activeSort = resolveSort(sort, SORTS);
 
   const open = status !== "closed";
-  const where: Prisma.RepairJobWhereInput = open
-    ? { status: { in: ["PENDING", "IN_PROGRESS"] } }
-    : { status: { in: ["COMPLETED", "WRITTEN_OFF"] } };
+  const search = textSearch(q, ["product.name", "product.sku", "issue"]);
+
+  const where: Prisma.RepairJobWhereInput = {
+    status: open
+      ? { in: ["PENDING", "IN_PROGRESS"] }
+      : { in: ["COMPLETED", "WRITTEN_OFF"] },
+    ...(search ? { OR: search } : {}),
+  };
 
   const [jobs, total, outOfService, spend, products] = await Promise.all([
     prisma.repairJob.findMany({
       where,
-      orderBy: { openedAt: "desc" },
+      orderBy: activeSort.orderBy,
       skip: pageInfo.skip,
       take: pageInfo.take,
       include: { product: { select: { name: true, sku: true } } },
@@ -98,10 +118,7 @@ export default async function AdminRepairsPage({
     available: Math.max(0, p.totalStock - p.reservedStock - p.underRepairStock),
   }));
 
-  const filters = [
-    { key: undefined, label: "Open" },
-    { key: "closed", label: "Closed" },
-  ];
+  const listParams = { view: rawView, q, sort, status };
 
   return (
     <div className="space-y-6">
@@ -116,33 +133,38 @@ export default async function AdminRepairsPage({
         }
       />
 
-      <div className="flex flex-wrap gap-2">
-        {filters.map((filter) => (
-          <Link
-            key={filter.label}
-            href={
-              filter.key ? `/admin/repairs?status=${filter.key}` : "/admin/repairs"
-            }
-            className={cn(
-              "rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors",
-              status === filter.key
-                ? "bg-brand-600 text-white shadow-card"
-                : "bg-surface text-ink-700 ring-1 ring-inset ring-line hover:bg-brand-50"
-            )}
-          >
-            {filter.label}
-          </Link>
-        ))}
-      </div>
+      <ListToolbar
+        basePath="/admin/repairs"
+        params={listParams}
+        searchPlaceholder="Search product, SKU or issue…"
+        sortOptions={SORTS.map(({ value, label }) => ({ value, label }))}
+        filters={[
+          {
+            key: "status",
+            options: [
+              { value: undefined, label: "Open" },
+              { value: "closed", label: "Closed" },
+            ],
+          },
+        ]}
+      />
 
-      {total === 0 ? (
+      {jobs.length === 0 ? (
         <EmptyState
           icon={Wrench}
-          title={open ? "Nothing in the workshop" : "No closed jobs yet"}
+          title={
+            q
+              ? "No repair jobs match"
+              : open
+                ? "Nothing in the workshop"
+                : "No closed jobs yet"
+          }
           description={
-            open
-              ? "Repair jobs open automatically when a return is inspected as damaged."
-              : "Completed and written-off repairs appear here."
+            q
+              ? "Try a different search term."
+              : open
+                ? "Repair jobs open automatically when a return is inspected as damaged."
+                : "Completed and written-off repairs appear here."
           }
         />
       ) : view === "cards" ? (
@@ -280,7 +302,7 @@ export default async function AdminRepairsPage({
       <Pagination
         meta={meta}
         basePath="/admin/repairs"
-        params={{ status, view: view === "cards" ? "cards" : undefined }}
+        params={listParams}
         label="repair jobs"
       />
     </div>

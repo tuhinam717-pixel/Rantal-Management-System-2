@@ -5,14 +5,24 @@ import { usePathname } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 
+/**
+ * Sidebar row for the customer portal.
+ *
+ * `/orders` must not light up while you are on `/orders/abc`'s sibling routes
+ * only by prefix accident, so the match is exact-or-child-path.
+ */
 export function PortalNavLink({
   href,
+  icon,
+  badge,
   children,
-  pill = false,
+  onNavigate,
 }: {
   href: string;
+  icon?: React.ReactNode;
+  badge?: number;
   children: React.ReactNode;
-  pill?: boolean;
+  onNavigate?: () => void;
 }) {
   const pathname = usePathname();
   const active = pathname === href || pathname.startsWith(`${href}/`);
@@ -20,22 +30,31 @@ export function PortalNavLink({
   return (
     <Link
       href={href}
+      onClick={onNavigate}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "whitespace-nowrap text-sm font-medium transition-colors",
-        pill
-          ? cn(
-              "rounded-full px-3 py-1.5",
-              active
-                ? "bg-brand-600 text-white"
-                : "text-ink-500 hover:bg-slate-100 hover:text-ink-900"
-            )
-          : active
-            ? "text-ink-900"
-            : "text-ink-500 hover:text-ink-900"
+        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+        active
+          ? "bg-brand-50 font-medium text-brand-700"
+          : "text-ink-600 hover:bg-slate-100 hover:text-ink-900"
       )}
     >
-      {children}
+      {icon && (
+        <span className={cn("shrink-0", active ? "text-brand-600" : "text-ink-400")}>
+          {icon}
+        </span>
+      )}
+      <span className="min-w-0 flex-1 truncate">{children}</span>
+      {badge !== undefined && badge > 0 && (
+        <span
+          className={cn(
+            "grid min-w-5 shrink-0 place-items-center rounded-full px-1.5 text-xs font-semibold",
+            active ? "bg-brand-600 text-white" : "bg-slate-200 text-ink-700"
+          )}
+        >
+          {badge}
+        </span>
+      )}
     </Link>
   );
 }

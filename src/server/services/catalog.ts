@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { Prisma } from "@prisma/client";
+
 import { prisma } from "@/lib/prisma";
 import type { ProductVM, RentalPeriodVM, RentalUnit } from "@/types";
 
@@ -69,6 +71,7 @@ export async function listProducts(options?: {
   search?: string;
   skip?: number;
   take?: number;
+  orderBy?: Prisma.ProductOrderByWithRelationInput;
 }): Promise<{ items: ProductVM[]; total: number }> {
   const pricelistId = await getActivePricelistId();
 
@@ -88,7 +91,7 @@ export async function listProducts(options?: {
   const [products, total] = await Promise.all([
     prisma.product.findMany({
       where,
-      orderBy: { name: "asc" },
+      orderBy: options?.orderBy ?? { name: "asc" },
       skip: options?.skip,
       take: options?.take,
       include: {

@@ -12,7 +12,10 @@ import {
 } from "@/components/ui/data-table";
 import { DateRange } from "@/components/ui/date-range";
 import { PageHeader } from "@/components/ui/page-header";
+import { ListToolbar } from "@/components/ui/list-toolbar";
 import { Pagination } from "@/components/ui/pagination";
+import { resolveSort, type SortOption } from "@/lib/list-query";
+import type { Prisma } from "@prisma/client";
 import { StatusBadge } from "@/components/orders/status-badge";
 import { ViewToggle } from "@/components/ui/view-toggle";
 import { pageMeta, resolvePage } from "@/lib/pagination";
@@ -23,6 +26,22 @@ import { formatCurrency } from "@/lib/utils";
 import type { OrderStatus } from "@/types";
 
 export const metadata: Metadata = { title: "My rentals" };
+
+const FILTERS = [
+  { value: undefined, label: "All" },
+  { value: "active", label: "Active" },
+  { value: "overdue", label: "Overdue" },
+  { value: "completed", label: "Completed" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
+const SORTS: SortOption<Prisma.RentalOrderOrderByWithRelationInput>[] = [
+  { value: "newest", label: "Newest first", orderBy: { createdAt: "desc" } },
+  { value: "oldest", label: "Oldest first", orderBy: { createdAt: "asc" } },
+  { value: "due", label: "Return date (soonest)", orderBy: { rentalEnd: "asc" } },
+  { value: "value", label: "Highest total", orderBy: { total: "desc" } },
+  { value: "value-asc", label: "Lowest total", orderBy: { total: "asc" } },
+];
 
 const COLUMNS = [
   { key: "order", label: "Order" },
@@ -35,19 +54,31 @@ const COLUMNS = [
 export default async function OrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; page?: string }>;
+  searchParams: Promise<{
+    view?: string;
+    page?: string;
+    status?: string;
+    q?: string;
+    sort?: string;
+  }>;
 }) {
   const user = await requireUser();
-  const { view: rawView, page } = await searchParams;
+  const { view: rawView, page, status, q, sort } = await searchParams;
   const view = resolveView(rawView);
   const pageInfo = resolvePage(page, 10);
+  const activeSort = resolveSort(sort, SORTS);
 
   const { items: orders, total } = await listOrdersForCustomer(user.id, {
     skip: pageInfo.skip,
     take: pageInfo.take,
+    status,
+    search: q,
+    orderBy: activeSort.orderBy,
   });
 
   const meta = pageMeta(pageInfo, total);
+  const listParams = { view: rawView, status, q, sort };
+  const filtered = Boolean(status || q);
 
   const itemsOf = (o: (typeof orders)[number]) =>
     o.lines.map((l) => `${l.product.name} x${l.quantity}`).join(", ");
@@ -56,24 +87,47 @@ export default async function OrdersPage({
     <div className="space-y-6">
       <PageHeader
         title="My rentals"
-        description={`${total} ${total === 1 ? "rental" : "rentals"}`}
-        actions={total > 0 ? <ViewToggle current={view} /> : undefined}
+        description={`${total} ${total === 1 ? "rental" : "rentals"}${
+          filtered ? " matching your filters" : ""
+        }`}
+        actions={orders.length > 0 ? <ViewToggle current={view} /> : undefined}
+      />
+
+      <ListToolbar
+        basePath="/orders"
+        params={listParams}
+        searchPlaceholder="Search order no. or product…"
+        sortOptions={SORTS.map(({ value, label }) => ({ value, label }))}
+        filters={[{ key: "status", options: FILTERS }]}
       />
 
       {orders.length === 0 ? (
-        <EmptyState
-          icon={PackageSearch}
-          title="You have no rentals yet"
-          description="Browse the catalogue and book your first rental."
-          action={
-            <Link href="/products">
-              <Button>
-                Browse rentals
-                <ArrowRight className="size-4" aria-hidden />
-              </Button>
-            </Link>
-          }
-        />
+        filtered ? (
+          <EmptyState
+            icon={PackageSearch}
+            title="No rentals match those filters"
+            description="Try a different status, or clear the search term."
+            action={
+              <Link href="/orders">
+                <Button variant="soft">Clear filters</Button>
+              </Link>
+            }
+          />
+        ) : (
+          <EmptyState
+            icon={PackageSearch}
+            title="You have no rentals yet"
+            description="Browse the catalogue and book your first rental."
+            action={
+              <Link href="/products">
+                <Button>
+                  Browse rentals
+                  <ArrowRight className="size-4" aria-hidden />
+                </Button>
+              </Link>
+            }
+          />
+        )
       ) : view === "cards" ? (
         <CardGrid>
           {orders.map((order) => (
@@ -161,7 +215,7 @@ export default async function OrdersPage({
       <Pagination
         meta={meta}
         basePath="/orders"
-        params={{ view: view === "cards" ? "cards" : undefined }}
+        params={listParams}
         label="rentals"
       />
     </div>

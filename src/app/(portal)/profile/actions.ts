@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireUser } from "@/lib/auth/current-user";
+import { imageUrlSchema } from "@/lib/image";
 import { prisma } from "@/lib/prisma";
 
 export type FormState = {
@@ -20,11 +21,7 @@ const profileSchema = z.object({
     .regex(/^[0-9+\-\s()]{7,20}$/, "Enter a valid phone number")
     .or(z.literal(""))
     .optional(),
-  imageUrl: z
-    .string()
-    .url("Enter a valid image URL")
-    .or(z.literal(""))
-    .optional(),
+  imageUrl: imageUrlSchema,
 });
 
 export async function updateProfileAction(

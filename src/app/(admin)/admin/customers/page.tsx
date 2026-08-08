@@ -9,16 +9,27 @@ import {
   EmptyState,
   TableRow,
 } from "@/components/ui/data-table";
+import { ListToolbar } from "@/components/ui/list-toolbar";
 import { PageHeader } from "@/components/ui/page-header";
 import { Pagination } from "@/components/ui/pagination";
 import { ViewToggle } from "@/components/ui/view-toggle";
 import { pageMeta, resolvePage } from "@/lib/pagination";
+import { resolveSort, textSearch, type SortOption } from "@/lib/list-query";
 import { resolveView } from "@/lib/view-mode";
 import { requireRole } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import type { Prisma } from "@prisma/client";
 
 export const metadata: Metadata = { title: "Customers" };
+
+const SORTS: SortOption<Prisma.UserOrderByWithRelationInput>[] = [
+  { value: "newest", label: "Newest first", orderBy: { createdAt: "desc" } },
+  { value: "oldest", label: "Oldest first", orderBy: { createdAt: "asc" } },
+  { value: "name", label: "Name A–Z", orderBy: { name: "asc" } },
+  { value: "name-desc", label: "Name Z–A", orderBy: { name: "desc" } },
+  { value: "rentals", label: "Most rentals", orderBy: { orders: { _count: "desc" } } },
+];
 
 const COLUMNS = [
   { key: "customer", label: "Customer" },
@@ -32,17 +43,33 @@ const COLUMNS = [
 export default async function AdminCustomersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; page?: string }>;
+  searchParams: Promise<{
+    view?: string;
+    page?: string;
+    q?: string;
+    sort?: string;
+    status?: string;
+  }>;
 }) {
   await requireRole("ADMIN");
-  const { view: rawView, page } = await searchParams;
+  const { view: rawView, page, q, sort, status } = await searchParams;
   const view = resolveView(rawView);
   const pageInfo = resolvePage(page);
+  const activeSort = resolveSort(sort, SORTS);
+
+  const search = textSearch(q, ["name", "email", "phone"]);
+
+  const where: Prisma.UserWhereInput = {
+    role: "CUSTOMER",
+    ...(status === "active" ? { isActive: true } : {}),
+    ...(status === "inactive" ? { isActive: false } : {}),
+    ...(search ? { OR: search } : {}),
+  };
 
   const [customers, total] = await Promise.all([
     prisma.user.findMany({
-      where: { role: "CUSTOMER" },
-      orderBy: { createdAt: "desc" },
+      where,
+      orderBy: activeSort.orderBy,
       skip: pageInfo.skip,
       take: pageInfo.take,
       include: {
@@ -50,10 +77,11 @@ export default async function AdminCustomersPage({
         _count: { select: { orders: true, addresses: true } },
       },
     }),
-    prisma.user.count({ where: { role: "CUSTOMER" } }),
+    prisma.user.count({ where }),
   ]);
 
   const meta = pageMeta(pageInfo, total);
+  const listParams = { view: rawView, q, sort, status };
 
   const stats = (c: (typeof customers)[number]) => ({
     lifetime: c.orders.reduce((sum, o) => sum + Number(o.total), 0),
@@ -74,11 +102,32 @@ export default async function AdminCustomersPage({
         actions={<ViewToggle current={view} />}
       />
 
+      <ListToolbar
+        basePath="/admin/customers"
+        params={listParams}
+        searchPlaceholder="Search name, email or phone…"
+        sortOptions={SORTS.map(({ value, label }) => ({ value, label }))}
+        filters={[
+          {
+            key: "status",
+            options: [
+              { value: undefined, label: "All" },
+              { value: "active", label: "Active" },
+              { value: "inactive", label: "Deactivated" },
+            ],
+          },
+        ]}
+      />
+
       {customers.length === 0 ? (
         <EmptyState
           icon={Users}
-          title="No customers yet"
-          description="Customers appear here once they register on the portal."
+          title={q || status ? "No customers match" : "No customers yet"}
+          description={
+            q || status
+              ? "Try a different search term or filter."
+              : "Customers appear here once they register on the portal."
+          }
         />
       ) : view === "cards" ? (
         <CardGrid>
@@ -193,7 +242,7 @@ export default async function AdminCustomersPage({
       <Pagination
         meta={meta}
         basePath="/admin/customers"
-        params={{ view: view === "cards" ? "cards" : undefined }}
+        params={listParams}
         label="customers"
       />
     </div>

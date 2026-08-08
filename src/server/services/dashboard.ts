@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { Prisma } from "@prisma/client";
+
 import { prisma } from "@/lib/prisma";
 import type { DashboardKpisVM } from "@/types";
 
@@ -93,6 +95,90 @@ export async function getDashboardKpis(now = new Date()): Promise<DashboardKpisV
     rentalRevenue: Number(revenue._sum.amount ?? 0),
     depositsHeld: Math.max(0, held),
     lateFeesCollected: Number(lateFees._sum.amount ?? 0),
+  };
+}
+
+/**
+ * The portal equivalent of {@link getDashboardKpis}, scoped to one customer.
+ *
+ * Payments and deposits hang off the order rather than the user, so both are
+ * filtered through `order.customerId` instead of a direct column.
+ */
+export async function getCustomerDashboard(userId: string, now = new Date()) {
+  const { start: todayStart } = dayBounds(now);
+  const weekAhead = new Date(todayStart);
+  weekAhead.setDate(weekAhead.getDate() + 7);
+
+  const openOrder: Prisma.RentalOrderWhereInput = {
+    customerId: userId,
+    status: { notIn: ["COMPLETED", "CANCELLED", "RETURNED"] },
+  };
+
+  const [
+    activeRentals,
+    overdueRentals,
+    returningSoon,
+    deposits,
+    spend,
+    upcoming,
+    recent,
+  ] = await Promise.all([
+    prisma.rentalOrder.count({
+      where: { customerId: userId, status: { in: [...ACTIVE_STATUSES] } },
+    }),
+    prisma.rentalOrder.count({
+      where: { ...openOrder, rentalEnd: { lt: now }, returnedAt: null },
+    }),
+    prisma.rentalOrder.count({
+      where: {
+        ...openOrder,
+        returnedAt: null,
+        rentalEnd: { gte: now, lt: weekAhead },
+      },
+    }),
+    prisma.securityDeposit.aggregate({
+      where: {
+        order: { customerId: userId },
+        status: { in: ["COLLECTED", "HELD", "PARTIALLY_REFUNDED"] },
+      },
+      _sum: { amount: true, deductedAmount: true, refundedAmount: true },
+    }),
+    prisma.payment.aggregate({
+      where: {
+        order: { customerId: userId },
+        purpose: "RENTAL",
+        status: "PAID",
+      },
+      _sum: { amount: true },
+    }),
+    // What the customer has to act on: the next returns falling due.
+    prisma.rentalOrder.findMany({
+      where: { ...openOrder, returnedAt: null },
+      orderBy: { rentalEnd: "asc" },
+      take: 4,
+      include: { lines: { include: { product: { select: { name: true } } } } },
+    }),
+    prisma.rentalOrder.findMany({
+      where: { customerId: userId },
+      orderBy: { createdAt: "desc" },
+      take: 4,
+      include: { lines: { include: { product: { select: { name: true } } } } },
+    }),
+  ]);
+
+  const held =
+    Number(deposits._sum.amount ?? 0) -
+    Number(deposits._sum.deductedAmount ?? 0) -
+    Number(deposits._sum.refundedAmount ?? 0);
+
+  return {
+    activeRentals,
+    overdueRentals,
+    returningSoon,
+    depositsHeld: Math.max(0, held),
+    totalSpent: Number(spend._sum.amount ?? 0),
+    upcoming,
+    recent,
   };
 }
 

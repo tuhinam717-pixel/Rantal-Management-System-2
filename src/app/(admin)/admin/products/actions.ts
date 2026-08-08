@@ -6,6 +6,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import { requireRole } from "@/lib/auth/current-user";
+import { imageUrlSchema } from "@/lib/image";
 import { prisma } from "@/lib/prisma";
 
 export type FormState = { error?: string; ok?: boolean };
@@ -21,7 +22,7 @@ const productSchema = z.object({
   name: z.string().min(2, "Name is required"),
   sku: z.string().min(2, "SKU is required"),
   description: z.string().optional(),
-  imageUrl: z.string().url("Enter a valid image URL").or(z.literal("")).optional(),
+  imageUrl: imageUrlSchema,
   categoryId: z.string().optional(),
   totalStock: z.coerce.number().int().min(0, "Stock cannot be negative"),
   depositType: z.enum(["FIXED", "PERCENTAGE"]),

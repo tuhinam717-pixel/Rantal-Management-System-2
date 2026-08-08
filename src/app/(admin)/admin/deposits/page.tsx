@@ -10,16 +10,37 @@ import {
   EmptyState,
   TableRow,
 } from "@/components/ui/data-table";
+import { ListToolbar } from "@/components/ui/list-toolbar";
 import { PageHeader } from "@/components/ui/page-header";
 import { Pagination } from "@/components/ui/pagination";
 import { ViewToggle } from "@/components/ui/view-toggle";
 import { requireRole } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma";
 import { pageMeta, resolvePage } from "@/lib/pagination";
+import { resolveSort, textSearch, type SortOption } from "@/lib/list-query";
 import { resolveView } from "@/lib/view-mode";
+import type { Prisma } from "@prisma/client";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Security deposits" };
+
+const SORTS: SortOption<Prisma.SecurityDepositOrderByWithRelationInput>[] = [
+  { value: "newest", label: "Newest first", orderBy: { createdAt: "desc" } },
+  { value: "oldest", label: "Oldest first", orderBy: { createdAt: "asc" } },
+  { value: "amount", label: "Highest amount", orderBy: { amount: "desc" } },
+  { value: "amount-asc", label: "Lowest amount", orderBy: { amount: "asc" } },
+  { value: "order", label: "Order number", orderBy: { order: { number: "asc" } } },
+];
+
+const STATUS_FILTERS = [
+  { value: undefined, label: "All" },
+  { value: "HELD", label: "Held" },
+  { value: "COLLECTED", label: "Collected" },
+  { value: "PARTIALLY_REFUNDED", label: "Partly refunded" },
+  { value: "REFUNDED", label: "Refunded" },
+  { value: "FORFEITED", label: "Forfeited" },
+  { value: "PENDING", label: "Pending" },
+];
 
 const STATUS_TONE: Record<string, BadgeTone> = {
   PENDING: "neutral",
@@ -43,16 +64,31 @@ const COLUMNS = [
 export default async function AdminDepositsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; page?: string }>;
+  searchParams: Promise<{
+    view?: string;
+    page?: string;
+    q?: string;
+    sort?: string;
+    status?: string;
+  }>;
 }) {
   await requireRole("ADMIN");
-  const { view: rawView, page } = await searchParams;
+  const { view: rawView, page, q, sort, status } = await searchParams;
   const view = resolveView(rawView);
   const pageInfo = resolvePage(page);
+  const activeSort = resolveSort(sort, SORTS);
+
+  const search = textSearch(q, ["order.number", "order.customer.name"]);
+
+  const where: Prisma.SecurityDepositWhereInput = {
+    ...(status ? { status: status as Prisma.EnumDepositStatusFilter["equals"] } : {}),
+    ...(search ? { OR: search } : {}),
+  };
 
   const [deposits, total, heldAgg, settledAgg] = await Promise.all([
     prisma.securityDeposit.findMany({
-      orderBy: { createdAt: "desc" },
+      where,
+      orderBy: activeSort.orderBy,
       skip: pageInfo.skip,
       take: pageInfo.take,
       include: {
@@ -60,7 +96,7 @@ export default async function AdminDepositsPage({
         transactions: { orderBy: { createdAt: "asc" } },
       },
     }),
-    prisma.securityDeposit.count(),
+    prisma.securityDeposit.count({ where }),
     // Totals come from the database, not the current page, or the summary
     // would change every time you paged.
     prisma.securityDeposit.aggregate({
@@ -73,6 +109,7 @@ export default async function AdminDepositsPage({
   ]);
 
   const meta = pageMeta(pageInfo, total);
+  const listParams = { view: rawView, q, sort, status };
   const held = Number(heldAgg._sum.amount ?? 0);
   const deducted = Number(settledAgg._sum.deductedAmount ?? 0);
   const refunded = Number(settledAgg._sum.refundedAmount ?? 0);
@@ -109,11 +146,23 @@ export default async function AdminDepositsPage({
         ))}
       </div>
 
-      {total === 0 ? (
+      <ListToolbar
+        basePath="/admin/deposits"
+        params={listParams}
+        searchPlaceholder="Search order no. or customer…"
+        sortOptions={SORTS.map(({ value, label }) => ({ value, label }))}
+        filters={[{ key: "status", label: "Status", options: STATUS_FILTERS }]}
+      />
+
+      {deposits.length === 0 ? (
         <EmptyState
           icon={ShieldCheck}
-          title="No deposits yet"
-          description="Deposits appear here once a rental is confirmed."
+          title={q || status ? "No deposits match" : "No deposits yet"}
+          description={
+            q || status
+              ? "Try a different search term or status."
+              : "Deposits appear here once a rental is confirmed."
+          }
         />
       ) : view === "cards" ? (
         <CardGrid className="xl:grid-cols-2">
@@ -262,7 +311,7 @@ export default async function AdminDepositsPage({
       <Pagination
         meta={meta}
         basePath="/admin/deposits"
-        params={{ view: view === "cards" ? "cards" : undefined }}
+        params={listParams}
         label="deposits"
       />
     </div>

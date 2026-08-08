@@ -1,6 +1,7 @@
-import Image from "next/image";
 import Link from "next/link";
 import { ImageOff } from "lucide-react";
+
+import { AppImage } from "@/components/ui/app-image";
 
 import { formatCurrency } from "@/lib/utils";
 import type { ProductVM } from "@/types";
@@ -22,7 +23,7 @@ export function ProductCard({ product }: { product: ProductVM }) {
     >
       <div className="relative aspect-4/3 overflow-hidden bg-slate-100">
         {product.imageUrl ? (
-          <Image
+          <AppImage
             src={product.imageUrl}
             alt={product.name}
             fill

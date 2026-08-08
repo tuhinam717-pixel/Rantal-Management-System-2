@@ -10,26 +10,43 @@ import {
   TableRow,
 } from "@/components/ui/data-table";
 import { DateRange } from "@/components/ui/date-range";
+import { ListToolbar } from "@/components/ui/list-toolbar";
 import { PageHeader } from "@/components/ui/page-header";
 import { Pagination } from "@/components/ui/pagination";
 import { StatusBadge } from "@/components/orders/status-badge";
 import { ViewToggle } from "@/components/ui/view-toggle";
 import { pageMeta, resolvePage } from "@/lib/pagination";
+import { resolveSort, textSearch, type SortOption } from "@/lib/list-query";
 import { resolveView } from "@/lib/view-mode";
 import { requireRole } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { OrderStatus } from "@/types";
+import type { Prisma } from "@prisma/client";
 
 export const metadata: Metadata = { title: "Rental orders" };
 
 const FILTERS = [
-  { key: undefined, label: "All" },
-  { key: "ACTIVE", label: "Active" },
-  { key: "OVERDUE", label: "Overdue" },
-  { key: "CONFIRMED", label: "Confirmed" },
-  { key: "COMPLETED", label: "Completed" },
-] as const;
+  { value: undefined, label: "All" },
+  { value: "ACTIVE", label: "Active" },
+  { value: "OVERDUE", label: "Overdue" },
+  { value: "CONFIRMED", label: "Confirmed" },
+  { value: "READY_FOR_PICKUP", label: "Ready" },
+  { value: "PICKED_UP", label: "Picked up" },
+  { value: "RETURNED", label: "Returned" },
+  { value: "COMPLETED", label: "Completed" },
+  { value: "CANCELLED", label: "Cancelled" },
+];
+
+const SORTS: SortOption<Prisma.RentalOrderOrderByWithRelationInput>[] = [
+  { value: "newest", label: "Newest first", orderBy: { createdAt: "desc" } },
+  { value: "oldest", label: "Oldest first", orderBy: { createdAt: "asc" } },
+  { value: "due", label: "Return date (soonest)", orderBy: { rentalEnd: "asc" } },
+  { value: "due-desc", label: "Return date (latest)", orderBy: { rentalEnd: "desc" } },
+  { value: "value", label: "Highest value", orderBy: { total: "desc" } },
+  { value: "value-asc", label: "Lowest value", orderBy: { total: "asc" } },
+  { value: "number", label: "Order number", orderBy: { number: "asc" } },
+];
 
 const COLUMNS = [
   { key: "order", label: "Order" },
@@ -44,19 +61,46 @@ const COLUMNS = [
 export default async function AdminOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; view?: string; page?: string }>;
+  searchParams: Promise<{
+    status?: string;
+    view?: string;
+    page?: string;
+    q?: string;
+    sort?: string;
+    fulfilment?: string;
+  }>;
 }) {
   await requireRole("ADMIN");
-  const { status, view: rawView, page } = await searchParams;
+  const {
+    status,
+    view: rawView,
+    page,
+    q,
+    sort,
+    fulfilment,
+  } = await searchParams;
   const view = resolveView(rawView);
   const pageInfo = resolvePage(page);
+  const activeSort = resolveSort(sort, SORTS);
 
-  const where = status ? { status: status as OrderStatus } : {};
+  const search = textSearch(q, [
+    "number",
+    "customer.name",
+    "customer.email",
+    "lines.some.product.name",
+  ]);
+
+  const where: Prisma.RentalOrderWhereInput = {
+    ...(status ? { status: status as OrderStatus } : {}),
+    ...(fulfilment === "delivery" ? { fulfilment: "DELIVERY" } : {}),
+    ...(fulfilment === "pickup" ? { fulfilment: "STORE_PICKUP" } : {}),
+    ...(search ? { OR: search } : {}),
+  };
 
   const [orders, total] = await Promise.all([
     prisma.rentalOrder.findMany({
       where,
-      orderBy: { createdAt: "desc" },
+      orderBy: activeSort.orderBy,
       skip: pageInfo.skip,
       take: pageInfo.take,
       include: {
@@ -68,15 +112,8 @@ export default async function AdminOrdersPage({
   ]);
 
   const meta = pageMeta(pageInfo, total);
-
-  /** Switching a filter resets to page 1 but keeps the chosen layout. */
-  const filterHref = (key?: string) => {
-    const params = new URLSearchParams();
-    if (key) params.set("status", key);
-    if (view === "cards") params.set("view", "cards");
-    const q = params.toString();
-    return q ? `/admin/orders?${q}` : "/admin/orders";
-  };
+  const listParams = { view: rawView, q, sort, status, fulfilment };
+  const filtered = Boolean(q || status || fulfilment);
 
   const itemsOf = (order: (typeof orders)[number]) =>
     order.lines.map((l) => `${l.product.name} x${l.quantity}`).join(", ");
@@ -89,28 +126,34 @@ export default async function AdminOrdersPage({
         actions={<ViewToggle current={view} />}
       />
 
-      <div className="flex flex-wrap gap-2">
-        {FILTERS.map((filter) => (
-          <Link
-            key={filter.label}
-            href={filterHref(filter.key)}
-            className={cn(
-              "rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors",
-              status === filter.key
-                ? "bg-brand-600 text-white shadow-card"
-                : "bg-surface text-ink-700 ring-1 ring-inset ring-line hover:bg-brand-50 hover:ring-brand-300"
-            )}
-          >
-            {filter.label}
-          </Link>
-        ))}
-      </div>
+      <ListToolbar
+        basePath="/admin/orders"
+        params={listParams}
+        searchPlaceholder="Search order no., customer or product…"
+        sortOptions={SORTS.map(({ value, label }) => ({ value, label }))}
+        filters={[
+          { key: "status", label: "Status", options: FILTERS },
+          {
+            key: "fulfilment",
+            label: "Fulfilment",
+            options: [
+              { value: undefined, label: "Any" },
+              { value: "delivery", label: "Delivery" },
+              { value: "pickup", label: "Store pickup" },
+            ],
+          },
+        ]}
+      />
 
       {orders.length === 0 ? (
         <EmptyState
           icon={ScrollText}
-          title="No orders match this filter"
-          description="Try a different status, or create one from a quotation."
+          title={filtered ? "No orders match" : "No orders yet"}
+          description={
+            filtered
+              ? "Try a different status, search term or fulfilment filter."
+              : "Orders appear here once a quotation is confirmed."
+          }
         />
       ) : view === "cards" ? (
         <CardGrid>
@@ -206,7 +249,7 @@ export default async function AdminOrdersPage({
       <Pagination
         meta={meta}
         basePath="/admin/orders"
-        params={{ status, view: view === "cards" ? "cards" : undefined }}
+        params={listParams}
         label="orders"
       />
     </div>
