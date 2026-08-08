@@ -52,9 +52,16 @@ export async function getRentalPeriods() {
   });
 }
 
-/** Stock left after subtracting what's already reserved by open rentals. */
-function availableOf(totalStock: number, reservedStock: number) {
-  return Math.max(0, totalStock - reservedStock);
+/**
+ * Stock a customer can actually book: total, minus units already committed to
+ * open rentals, minus units withdrawn while a repair job is open.
+ */
+function availableOf(
+  totalStock: number,
+  reservedStock: number,
+  underRepairStock = 0
+) {
+  return Math.max(0, totalStock - reservedStock - underRepairStock);
 }
 
 export async function listProducts(options?: {
@@ -115,7 +122,11 @@ export async function listProducts(options?: {
       description: product.description ?? undefined,
       imageUrl: product.imageUrl ?? undefined,
       category: product.category?.name,
-      available: availableOf(product.totalStock, product.reservedStock),
+      available: availableOf(
+        product.totalStock,
+        product.reservedStock,
+        product.underRepairStock
+      ),
       fromPrice: cheapest?.price ?? 0,
       fromUnit: cheapest?.unit ?? "DAY",
       depositAmount: Number(product.depositValue),
@@ -169,7 +180,11 @@ export async function getProductBySlug(slug: string) {
     description: product.description ?? undefined,
     imageUrl: product.imageUrl ?? undefined,
     category: product.category?.name,
-    available: availableOf(product.totalStock, product.reservedStock),
+    available: availableOf(
+        product.totalStock,
+        product.reservedStock,
+        product.underRepairStock
+      ),
     depositAmount: Number(product.depositValue),
     depositType: product.depositType,
     variants: product.variants.map((v) => ({

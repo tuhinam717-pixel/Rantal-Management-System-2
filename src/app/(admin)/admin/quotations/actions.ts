@@ -80,14 +80,17 @@ export async function createQuotationAction(
   );
 
   const count = await prisma.quotation.count();
-  const validDays = settings?.quotationValidDays ?? 7;
-  const validUntil = new Date();
-  validUntil.setDate(validUntil.getDate() + validDays);
 
   const template = await prisma.quotationTemplate.findFirst({
     where: { isDefault: true },
-    select: { id: true },
+    select: { id: true, validityDays: true },
   });
+
+  // The template's own validity wins over the org default when it sets one.
+  const validDays =
+    template?.validityDays ?? settings?.quotationValidDays ?? 7;
+  const validUntil = new Date();
+  validUntil.setDate(validUntil.getDate() + validDays);
 
   await prisma.quotation.create({
     data: {
@@ -293,6 +296,19 @@ const templateSchema = z.object({
   header: z.string().optional(),
   footer: z.string().optional(),
   terms: z.string().optional(),
+  // From the mockup: "Quotation Validity ___ Days" and "Payment Terms ___ %".
+  paymentTermsPercent: z.coerce
+    .number()
+    .int()
+    .min(1, "Payment terms must be at least 1%")
+    .max(100, "Payment terms cannot exceed 100%"),
+  validityDays: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.trim() !== "" ? Number(v) : null))
+    .refine((v) => v === null || (Number.isInteger(v) && v >= 1), {
+      message: "Validity must be a whole number of days",
+    }),
   isDefault: z.coerce.boolean().optional(),
 });
 

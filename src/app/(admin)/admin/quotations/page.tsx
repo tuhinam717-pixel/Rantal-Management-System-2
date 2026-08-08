@@ -65,6 +65,7 @@ export default async function AdminQuotationsPage({
         customer: { select: { name: true, email: true } },
         lines: { include: { product: { select: { name: true } } } },
         order: { select: { number: true } },
+        template: { select: { paymentTermsPercent: true } },
       },
     }),
     prisma.quotation.count(),
@@ -216,6 +217,16 @@ export default async function AdminQuotationsPage({
                       {formatCurrency(Number(q.subtotal))} rent +{" "}
                       {formatCurrency(Number(q.depositTotal))} deposit
                     </p>
+                    {q.template &&
+                      q.template.paymentTermsPercent < 100 && (
+                        <p className="mt-1 text-xs font-medium text-brand-700">
+                          {q.template.paymentTermsPercent}% up front —{" "}
+                          {formatCurrency(
+                            (Number(q.total) * q.template.paymentTermsPercent) /
+                              100
+                          )}
+                        </p>
+                      )}
                   </div>
                 </div>
 

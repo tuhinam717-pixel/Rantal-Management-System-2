@@ -8,7 +8,8 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
-import { Textarea } from "@/components/ui/field";
+import { AffixInput, Textarea } from "@/components/ui/field";
+import { FieldRow } from "@/components/ui/form-shell";
 import {
   saveTemplateAction,
   type FormState,
@@ -74,6 +75,29 @@ export function NewTemplateDialog() {
             rows={4}
             placeholder="Deposit refunded in full on on-time return. Late returns attract a penalty deducted from the deposit."
           />
+
+          <FieldRow>
+            <AffixInput
+              label="Payment terms"
+              name="paymentTermsPercent"
+              type="number"
+              min={1}
+              max={100}
+              defaultValue={100}
+              suffix="%"
+              hint="Share of the total paid up front to confirm"
+              required
+            />
+            <AffixInput
+              label="Quotation validity"
+              name="validityDays"
+              type="number"
+              min={1}
+              suffix="days"
+              placeholder="Use org default"
+              hint="Leave blank to use the org setting"
+            />
+          </FieldRow>
 
           <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-canvas p-3.5 transition-colors hover:border-brand-300">
             <input

@@ -15,6 +15,7 @@ import {
   Truck,
   Undo2,
   Users,
+  Wrench,
 } from "lucide-react";
 
 import { AdminMobileNav } from "@/components/layout/admin-mobile-nav";
@@ -33,6 +34,7 @@ const NAV_GROUPS = [
       { href: "/admin/pickups", label: "Pickups", icon: Truck },
       { href: "/admin/returns", label: "Returns", icon: Undo2 },
       { href: "/admin/scan", label: "Scan", icon: ScanLine },
+      { href: "/admin/repairs", label: "Repairs", icon: Wrench },
     ],
   },
   {

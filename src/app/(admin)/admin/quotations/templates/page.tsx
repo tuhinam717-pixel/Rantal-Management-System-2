@@ -62,7 +62,24 @@ export default async function QuotationTemplatesPage() {
                 </form>
               </div>
 
-              <dl className="mt-4 space-y-3 border-t border-line pt-3 text-sm">
+              <dl className="mt-3 grid grid-cols-2 gap-2 border-t border-line pt-3 text-center">
+                <div>
+                  <dt className="text-xs text-ink-500">Payment up front</dt>
+                  <dd className="text-sm font-semibold tabular-nums text-ink-900">
+                    {template.paymentTermsPercent}%
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-ink-500">Valid for</dt>
+                  <dd className="text-sm font-semibold tabular-nums text-ink-900">
+                    {template.validityDays
+                      ? `${template.validityDays} days`
+                      : "Org default"}
+                  </dd>
+                </div>
+              </dl>
+
+              <dl className="mt-3 space-y-3 border-t border-line pt-3 text-sm">
                 {[
                   ["Header", template.header],
                   ["Footer", template.footer],

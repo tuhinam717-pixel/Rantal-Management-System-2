@@ -168,18 +168,49 @@ export async function processReturn(
     });
 
     for (const inspection of input.inspections ?? []) {
-      await tx.returnInspection.create({
+      const repairRequired = inspection.repairRequired ?? false;
+
+      const row = await tx.returnInspection.create({
         data: {
           returnId: returnRow.id,
           productId: inspection.productId,
           condition: inspection.condition,
           damageNote: inspection.damageNote,
           missingAccessories: inspection.missingAccessories,
-          repairRequired: inspection.repairRequired ?? false,
+          repairRequired,
           damageCharge: inspection.damageCharge ?? 0,
           inspectedAt: returnedAt,
         },
       });
+
+      // "Repair workflow initiation when required" from the brief: a damaged
+      // return opens a job and withdraws the unit from availability, so it
+      // can't be re-rented while it's broken.
+      if (repairRequired) {
+        const quantity =
+          order.lines.find((l) => l.productId === inspection.productId)
+            ?.quantity ?? 1;
+
+        await tx.repairJob.create({
+          data: {
+            productId: inspection.productId,
+            inspectionId: row.id,
+            orderNumber: order.number,
+            issue:
+              inspection.damageNote?.trim() ||
+              `Returned ${inspection.condition.replace(/_/g, " ").toLowerCase()}`,
+            quantity,
+            estimatedCost: inspection.damageCharge ?? 0,
+            status: "PENDING",
+            openedAt: returnedAt,
+          },
+        });
+
+        await tx.product.update({
+          where: { id: inspection.productId },
+          data: { underRepairStock: { increment: quantity } },
+        });
+      }
     }
 
     if (penalty.amount > 0) {

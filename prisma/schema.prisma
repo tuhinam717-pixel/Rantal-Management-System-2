@@ -121,6 +121,9 @@ model Product {
   isRentable    Boolean  @default(true)
   totalStock    Int      @default(0)
   reservedStock Int      @default(0)
+  /// Units withdrawn from service while a repair job is open. Availability is
+  /// totalStock - reservedStock - underRepairStock.
+  underRepairStock Int   @default(0)
 
   // Deposit defaults, overridable per pricelist / order.
   depositType   DepositType @default(FIXED)
@@ -134,6 +137,7 @@ model Product {
   orderLines     RentalOrderLine[]
   quotationLines QuotationLine[]
   cartItems      CartItem[]
+  repairJobs     RepairJob[]
 
   @@index([categoryId])
   @@map("products")
@@ -264,6 +268,11 @@ model QuotationTemplate {
   footer    String?
   terms     String?
   isDefault Boolean  @default(false)
+  /// Share of the total the client pays up front to confirm the quotation.
+  /// From the mockup's "Payment Terms ___ %".
+  paymentTermsPercent Int @default(100)
+  /// How long the quotation stays valid, overriding the org default.
+  validityDays        Int?
   createdAt DateTime @default(now())
 
   quotations Quotation[]
@@ -625,8 +634,46 @@ model ReturnInspection {
   damageCharge       Decimal       @default(0) @db.Decimal(12, 2)
   inspectedAt        DateTime      @default(now())
 
+  repairJob RepairJob?
+
   @@index([returnId])
   @@map("return_inspections")
+}
+
+enum RepairStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  WRITTEN_OFF
+}
+
+/// A unit out of service after a damaged return.
+///
+/// The brief asks for "repair workflow initiation when required": flagging an
+/// inspection as damaged opens one of these automatically, which withdraws the
+/// units from availability until the job is closed.
+model RepairJob {
+  id           String       @id @default(cuid())
+  productId    String
+  product      Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  inspectionId String?      @unique
+  inspection   ReturnInspection? @relation(fields: [inspectionId], references: [id], onDelete: SetNull)
+  /// The rental that caused the damage, for traceability.
+  orderNumber  String?
+  status       RepairStatus @default(PENDING)
+  issue        String
+  quantity     Int          @default(1)
+  estimatedCost Decimal     @default(0) @db.Decimal(12, 2)
+  actualCost   Decimal?     @db.Decimal(12, 2)
+  assignedTo   String?
+  notes        String?
+  openedAt     DateTime     @default(now())
+  startedAt    DateTime?
+  completedAt  DateTime?
+
+  @@index([productId])
+  @@index([status])
+  @@map("repair_jobs")
 }
 
 // ---------------------------------------------------------------------------
