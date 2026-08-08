@@ -1,0 +1,18 @@
+# `vercel --prod` uploads the working directory, and .gitignore does not stop
+# it. Without this, the local .env is bundled into the deployment and its
+# values leak into the build — which is how NEXT_PUBLIC_ENABLE_DEMO_LOGIN once
+# reached production and printed working credentials on the public login page.
+.env
+.env.*
+!.env.example
+
+.next
+node_modules
+
+# Local-only tooling and docs
+scripts/verify-flow.ts
+scripts/verify-crud.ts
+scripts/set-vercel-env.ps1
+scripts/setup-db.ps1
+docs
+README.md
