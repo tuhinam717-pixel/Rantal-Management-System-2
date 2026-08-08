@@ -14,7 +14,12 @@ import {
 import { PageHeader } from "@/components/ui/page-header";
 import { Pagination } from "@/components/ui/pagination";
 import { ViewToggle } from "@/components/ui/view-toggle";
-import { confirmPickupAction } from "@/app/(admin)/admin/actions";
+import { PickupChecklist } from "@/components/pickup-return/pickup-checklist";
+import {
+  RoutePlanner,
+  type RouteStop,
+} from "@/components/pickup-return/route-planner";
+import { parseChecklist } from "@/lib/rental/pickup-checklist";
 import { requireRole } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma";
 import { pageMeta, resolvePage } from "@/lib/pagination";
@@ -43,16 +48,24 @@ const COLUMNS = [
 export default async function AdminPickupsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; page?: string }>;
+  searchParams: Promise<{ view?: string; page?: string; day?: string }>;
 }) {
   await requireRole("ADMIN");
-  const { view: rawView, page } = await searchParams;
+  const { view: rawView, page, day: rawDay } = await searchParams;
   const view = resolveView(rawView);
   const pageInfo = resolvePage(page);
 
+  // Route planning is per day; default to today.
+  const day = /^\d{4}-\d{2}-\d{2}$/.test(rawDay ?? "")
+    ? rawDay!
+    : new Date().toLocaleDateString("en-CA");
+  const dayStart = new Date(`${day}T00:00:00`);
+  const dayEnd = new Date(dayStart);
+  dayEnd.setDate(dayEnd.getDate() + 1);
+
   const where = { status: { not: "COMPLETED" as const } };
 
-  const [pickups, total, done] = await Promise.all([
+  const [pickups, total, done, routeRows] = await Promise.all([
     prisma.pickup.findMany({
       where,
       orderBy: [{ scheduledFor: "asc" }, { routeSequence: "asc" }],
@@ -70,22 +83,69 @@ export default async function AdminPickupsPage({
     }),
     prisma.pickup.count({ where }),
     prisma.pickup.count({ where: { status: "COMPLETED" } }),
+    prisma.pickup.findMany({
+      where: { ...where, scheduledFor: { gte: dayStart, lt: dayEnd } },
+      orderBy: [{ routeSequence: "asc" }, { scheduledFor: "asc" }],
+      include: {
+        order: {
+          include: {
+            customer: { select: { name: true } },
+            shippingAddress: true,
+          },
+        },
+      },
+    }),
   ]);
 
   const meta = pageMeta(pageInfo, total);
 
+  const addressOf = (a: { line1: string; city: string; postalCode: string } | null) =>
+    a ? `${a.line1}, ${a.city} ${a.postalCode}` : "Collection from store";
+
   const placeOf = (p: (typeof pickups)[number]) =>
-    p.order.shippingAddress
-      ? `${p.order.shippingAddress.line1}, ${p.order.shippingAddress.city} ${p.order.shippingAddress.postalCode}`
-      : "Collection from store";
+    addressOf(p.order.shippingAddress);
+
+  const stops: RouteStop[] = routeRows.map((r) => ({
+    id: r.id,
+    orderId: r.orderId,
+    orderNumber: r.order.number,
+    customerName: r.order.customer.name,
+    place: addressOf(r.order.shippingAddress),
+    scheduledFor: r.scheduledFor,
+    routeSequence: r.routeSequence,
+    assignedTo: r.assignedTo,
+    checklist: r.checklist,
+  }));
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Pickup schedule"
         description={`${total} pending · ${done} completed · ordered by route sequence`}
-        actions={<ViewToggle current={view} />}
+        actions={
+          <>
+            {/* GET form so picking a day is a plain, shareable URL. */}
+            <form action="/admin/pickups" className="flex items-center gap-2">
+              {view === "cards" && (
+                <input type="hidden" name="view" value="cards" />
+              )}
+              <input
+                type="date"
+                name="day"
+                defaultValue={day}
+                aria-label="Route day"
+                className="rounded-xl border-0 bg-surface py-2 pl-3 pr-2 text-sm text-ink-900 shadow-sm ring-1 ring-inset ring-line focus:ring-2 focus:ring-inset focus:ring-brand-600 focus:outline-none"
+              />
+              <Button type="submit" variant="secondary" size="sm">
+                Plan day
+              </Button>
+            </form>
+            <ViewToggle current={view} />
+          </>
+        }
       />
+
+      <RoutePlanner day={day} stops={stops} />
 
       {total === 0 ? (
         <EmptyState
@@ -147,12 +207,11 @@ export default async function AdminPickupsPage({
                   )}
                 </div>
 
-                <form action={confirmPickupAction}>
-                  <input type="hidden" name="orderId" value={pickup.orderId} />
-                  <Button type="submit" size="sm">
-                    Confirm pickup
-                  </Button>
-                </form>
+                <PickupChecklist
+                  pickupId={pickup.id}
+                  orderNumber={pickup.order.number}
+                  items={parseChecklist(pickup.checklist)}
+                />
               </div>
             </Card>
           ))}
@@ -198,12 +257,12 @@ export default async function AdminPickupsPage({
               </td>
               <td className="px-4 py-3">
                 <div className="flex justify-end">
-                  <form action={confirmPickupAction}>
-                    <input type="hidden" name="orderId" value={pickup.orderId} />
-                    <Button type="submit" variant="soft" size="sm">
-                      Confirm
-                    </Button>
-                  </form>
+                  <PickupChecklist
+                    pickupId={pickup.id}
+                    orderNumber={pickup.order.number}
+                    items={parseChecklist(pickup.checklist)}
+                    compact
+                  />
                 </div>
               </td>
             </TableRow>
