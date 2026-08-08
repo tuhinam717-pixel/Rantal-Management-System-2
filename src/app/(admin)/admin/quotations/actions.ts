@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { requireRole } from "@/lib/auth/current-user";
-import { prisma } from "@/lib/prisma";
+import { LONG_TRANSACTION, prisma } from "@/lib/prisma";
 import { billableUnits, lineDeposit, lineRent, round2 } from "@/lib/rental/pricing";
 import { getActivePricelistId } from "@/server/services/catalog";
 
@@ -277,7 +277,7 @@ export async function confirmQuotationAction(formData: FormData) {
       where: { id: quotation.id },
       data: { status: "CONFIRMED" },
     });
-  });
+  }, LONG_TRANSACTION);
 
   revalidatePath("/admin/quotations");
   revalidatePath("/admin/orders");

@@ -2,7 +2,7 @@ import "server-only";
 
 import type { FulfilmentMethod } from "@prisma/client";
 
-import { prisma } from "@/lib/prisma";
+import { LONG_TRANSACTION, prisma } from "@/lib/prisma";
 import { round2 } from "@/lib/rental/pricing";
 import { getCart } from "@/server/services/cart";
 
@@ -172,7 +172,7 @@ export async function checkout(userId: string, input: CheckoutInput) {
     });
 
     return order;
-  });
+  }, LONG_TRANSACTION);
 }
 
 export async function listOrdersForCustomer(userId: string) {

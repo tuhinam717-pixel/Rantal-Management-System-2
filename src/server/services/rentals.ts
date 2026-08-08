@@ -2,7 +2,7 @@ import "server-only";
 
 import type { ItemCondition } from "@prisma/client";
 
-import { prisma } from "@/lib/prisma";
+import { LONG_TRANSACTION, prisma } from "@/lib/prisma";
 import { lateFee, round2, settleDeposit } from "@/lib/rental/pricing";
 
 /**
@@ -282,5 +282,5 @@ export async function processReturn(
         lateFeeTotal: penalty.amount,
       },
     });
-  });
+  }, LONG_TRANSACTION);
 }

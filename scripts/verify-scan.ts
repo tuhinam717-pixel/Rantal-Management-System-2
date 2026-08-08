@@ -127,6 +127,52 @@ async function main() {
     check("settled order -> NONE", r.order?.nextAction, "NONE");
   }
 
+  console.log("\n--- scan actions move the order forward ---");
+  const { scanConfirmPickupAction, scanProcessReturnAction } = await import(
+    "../src/app/(admin)/admin/scan/actions"
+  );
+
+  // Pick an order still awaiting pickup and drive it all the way through.
+  const target = await prisma.rentalOrder.findFirst({
+    where: { returnedAt: null, pickup: { status: { not: "COMPLETED" } } },
+    include: { lines: true, deposit: true },
+  });
+
+  if (!target) {
+    console.log("SKIP  no order awaiting pickup to drive through");
+  } else {
+    const afterPickup = await scanConfirmPickupAction(target.id);
+    check("pickup action reports success", Boolean(afterPickup.done), true);
+    check("pickup action returns fresh state", afterPickup.order?.nextAction, "RETURN");
+    check(
+      "order status advanced",
+      afterPickup.order?.status,
+      "PICKED_UP"
+    );
+
+    const depositBefore = Number(target.deposit?.amount ?? 0);
+    const afterReturn = await scanProcessReturnAction({
+      orderId: target.id,
+      productId: target.lines[0]?.productId ?? "",
+      condition: "GOOD",
+    });
+
+    check("return action reports success", Boolean(afterReturn.done), true);
+    check("nothing left to do", afterReturn.order?.nextAction, "NONE");
+    check("order completed", afterReturn.order?.status, "COMPLETED");
+
+    const deposit = await prisma.securityDeposit.findFirst({
+      where: { orderId: target.id },
+    });
+    const settledTotal =
+      Number(deposit?.deductedAmount ?? 0) + Number(deposit?.refundedAmount ?? 0);
+    check("deposit fully settled", Math.round(settledTotal), Math.round(depositBefore));
+
+    // A second scan of a settled order must not offer an action again.
+    const rescan = await lookupScanAction(buildScanCode(target.number));
+    check("re-scan of settled order offers nothing", rescan.order?.nextAction, "NONE");
+  }
+
   console.log(`\n${failed === 0 ? "ALL SCAN CHECKS PASSED" : `${failed} CHECK(S) FAILED`}`);
   await prisma.$disconnect();
   process.exit(failed > 0 ? 1 : 0);
