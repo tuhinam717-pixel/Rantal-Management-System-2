@@ -6,6 +6,8 @@ import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
+import { Pagination } from "@/components/ui/pagination";
+import { pageMeta, resolvePage } from "@/lib/pagination";
 import { DeleteButton } from "@/components/admin/delete-button";
 import { PriceGrid } from "@/components/admin/price-grid";
 import { NewPricelistDialog } from "@/components/admin/new-pricelist-form";
@@ -23,12 +25,14 @@ export const metadata: Metadata = { title: "Pricelists" };
 export default async function AdminPricelistsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ edit?: string }>;
+  searchParams: Promise<{ edit?: string; page?: string }>;
 }) {
   await requireRole("ADMIN");
-  const { edit } = await searchParams;
+  const { edit, page } = await searchParams;
+  // The grid can hold hundreds of products, so it pages like any other table.
+  const pageInfo = resolvePage(page, 15);
 
-  const [pricelists, products, periods] = await Promise.all([
+  const [pricelists, products, productCount, periods] = await Promise.all([
     prisma.pricelist.findMany({
       orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
       include: { _count: { select: { items: true } } },
@@ -36,13 +40,18 @@ export default async function AdminPricelistsPage({
     prisma.product.findMany({
       where: { isRentable: true },
       orderBy: { name: "asc" },
+      skip: pageInfo.skip,
+      take: pageInfo.take,
       select: { id: true, name: true, sku: true },
     }),
+    prisma.product.count({ where: { isRentable: true } }),
     prisma.rentalPeriod.findMany({
       where: { isActive: true },
       orderBy: { id: "asc" },
     }),
   ]);
+
+  const gridMeta = pageMeta(pageInfo, productCount);
 
   const defaultList = pricelists.find((p) => p.isDefault);
   const brokenDefault = Boolean(defaultList && defaultList._count.items === 0);
@@ -50,8 +59,14 @@ export default async function AdminPricelistsPage({
   const editing =
     pricelists.find((p) => p.id === edit) ?? (edit ? undefined : defaultList);
 
+  // Only the rates for the products on this page are needed.
   const items = editing
-    ? await prisma.pricelistItem.findMany({ where: { pricelistId: editing.id } })
+    ? await prisma.pricelistItem.findMany({
+        where: {
+          pricelistId: editing.id,
+          productId: { in: products.map((p) => p.id) },
+        },
+      })
     : [];
 
   const prices = Object.fromEntries(
@@ -168,8 +183,19 @@ export default async function AdminPricelistsPage({
           <PriceGrid
             pricelistId={editing.id}
             products={products}
-            periods={periods.map((p) => ({ id: p.id, name: p.name }))}
+            periods={periods.map((p) => ({
+              id: p.id,
+              name: p.name,
+              unit: p.unit,
+            }))}
             prices={prices}
+          />
+
+          <Pagination
+            meta={gridMeta}
+            basePath="/admin/pricelists"
+            params={{ edit: editing.id }}
+            label="products"
           />
         </section>
       )}

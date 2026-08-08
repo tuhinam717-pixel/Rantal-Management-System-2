@@ -7,6 +7,10 @@ import {
   TrendingUp,
 } from "lucide-react";
 
+import {
+  RevenueChart,
+  type RevenuePoint,
+} from "@/components/dashboard/revenue-chart";
 import { requireRole } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma";
 import { cn, formatCurrency } from "@/lib/utils";
@@ -46,7 +50,7 @@ export default async function AdminReportsPage() {
   ]);
 
   // ---- monthly revenue ---------------------------------------------------
-  const months: { key: string; label: string; total: number }[] = [];
+  const months: RevenuePoint[] = [];
   for (let i = 0; i < 12; i++) {
     const d = new Date(yearAgo);
     d.setMonth(d.getMonth() + i);
@@ -54,6 +58,7 @@ export default async function AdminReportsPage() {
       key: `${d.getFullYear()}-${d.getMonth()}`,
       label: d.toLocaleDateString("en-IN", { month: "short" }),
       total: 0,
+      orders: 0,
     });
   }
   const monthIndex = new Map(months.map((m, i) => [m.key, i]));
@@ -61,9 +66,11 @@ export default async function AdminReportsPage() {
     if (!payment.paidAt) continue;
     const key = `${payment.paidAt.getFullYear()}-${payment.paidAt.getMonth()}`;
     const idx = monthIndex.get(key);
-    if (idx !== undefined) months[idx].total += Number(payment.amount);
+    if (idx !== undefined) {
+      months[idx].total += Number(payment.amount);
+      months[idx].orders += 1;
+    }
   }
-  const peak = Math.max(1, ...months.map((m) => m.total));
   const totalRevenue = months.reduce((sum, m) => sum + m.total, 0);
 
   // ---- top products ------------------------------------------------------
@@ -139,25 +146,18 @@ export default async function AdminReportsPage() {
         />
       </div>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-5">
-        <h2 className="text-sm font-semibold text-ink-900">
-          Monthly rental revenue
-        </h2>
+      <section className="rounded-2xl border border-line bg-surface p-5 shadow-card">
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <h2 className="text-sm font-semibold text-ink-900">
+            Monthly rental revenue
+          </h2>
+          <p className="text-xs text-ink-500">
+            Rent only, excluding deposits. Hover a month for the detail.
+          </p>
+        </div>
 
-        {/* Simple CSS bar chart — no charting dependency needed for 12 bars. */}
-        <div className="mt-5 flex h-48 items-end gap-2">
-          {months.map((month) => (
-            <div key={month.key} className="flex min-w-0 flex-1 flex-col items-center gap-2">
-              <div className="flex w-full flex-1 items-end">
-                <div
-                  className="w-full rounded-t bg-brand-500 transition-all"
-                  style={{ height: `${Math.max(2, (month.total / peak) * 100)}%` }}
-                  title={`${month.label}: ${formatCurrency(month.total)}`}
-                />
-              </div>
-              <span className="text-xs text-ink-500">{month.label}</span>
-            </div>
-          ))}
+        <div className="mt-5">
+          <RevenueChart data={months} />
         </div>
       </section>
 

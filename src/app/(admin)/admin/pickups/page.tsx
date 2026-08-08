@@ -5,11 +5,20 @@ import { MapPin, Route, Truck, User } from "lucide-react";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { CardGrid, EmptyState } from "@/components/ui/data-table";
+import {
+  CardGrid,
+  DataTable,
+  EmptyState,
+  TableRow,
+} from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
+import { Pagination } from "@/components/ui/pagination";
+import { ViewToggle } from "@/components/ui/view-toggle";
 import { confirmPickupAction } from "@/app/(admin)/admin/actions";
 import { requireRole } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma";
+import { pageMeta, resolvePage } from "@/lib/pagination";
+import { resolveView } from "@/lib/view-mode";
 import { formatDate } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Pickups" };
@@ -21,41 +30,72 @@ const STATUS_TONE: Record<string, BadgeTone> = {
   MISSED: "danger",
 };
 
-export default async function AdminPickupsPage() {
-  await requireRole("ADMIN");
+const COLUMNS = [
+  { key: "order", label: "Order" },
+  { key: "customer", label: "Customer" },
+  { key: "address", label: "Where" },
+  { key: "scheduled", label: "Scheduled" },
+  { key: "stop", label: "Stop", align: "right" as const },
+  { key: "status", label: "Status" },
+  { key: "actions", label: "", align: "right" as const },
+];
 
-  const pickups = await prisma.pickup.findMany({
-    orderBy: [{ scheduledFor: "asc" }, { routeSequence: "asc" }],
-    include: {
-      order: {
-        include: {
-          customer: { select: { name: true, phone: true } },
-          shippingAddress: true,
-          lines: { include: { product: { select: { name: true } } } },
+export default async function AdminPickupsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string; page?: string }>;
+}) {
+  await requireRole("ADMIN");
+  const { view: rawView, page } = await searchParams;
+  const view = resolveView(rawView);
+  const pageInfo = resolvePage(page);
+
+  const where = { status: { not: "COMPLETED" as const } };
+
+  const [pickups, total, done] = await Promise.all([
+    prisma.pickup.findMany({
+      where,
+      orderBy: [{ scheduledFor: "asc" }, { routeSequence: "asc" }],
+      skip: pageInfo.skip,
+      take: pageInfo.take,
+      include: {
+        order: {
+          include: {
+            customer: { select: { name: true, phone: true } },
+            shippingAddress: true,
+            lines: { include: { product: { select: { name: true } } } },
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.pickup.count({ where }),
+    prisma.pickup.count({ where: { status: "COMPLETED" } }),
+  ]);
 
-  const pending = pickups.filter((p) => p.status !== "COMPLETED");
-  const done = pickups.filter((p) => p.status === "COMPLETED").length;
+  const meta = pageMeta(pageInfo, total);
+
+  const placeOf = (p: (typeof pickups)[number]) =>
+    p.order.shippingAddress
+      ? `${p.order.shippingAddress.line1}, ${p.order.shippingAddress.city} ${p.order.shippingAddress.postalCode}`
+      : "Collection from store";
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Pickup schedule"
-        description={`${pending.length} pending · ${done} completed · ordered by route sequence`}
+        description={`${total} pending · ${done} completed · ordered by route sequence`}
+        actions={<ViewToggle current={view} />}
       />
 
-      {pending.length === 0 ? (
+      {total === 0 ? (
         <EmptyState
           icon={Truck}
           title="No pickups outstanding"
           description="Every scheduled handover has been confirmed."
         />
-      ) : (
+      ) : view === "cards" ? (
         <CardGrid>
-          {pending.map((pickup) => (
+          {pickups.map((pickup) => (
             <Card key={pickup.id} className="flex flex-col p-5">
               <div className="flex flex-wrap items-center gap-2">
                 <Link
@@ -87,9 +127,7 @@ export default async function AdminPickupsPage() {
 
               <p className="mt-2 inline-flex items-start gap-1.5 text-xs text-ink-500">
                 <MapPin className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-                {pickup.order.shippingAddress
-                  ? `${pickup.order.shippingAddress.line1}, ${pickup.order.shippingAddress.city} ${pickup.order.shippingAddress.postalCode}`
-                  : "Collection from store"}
+                {placeOf(pickup)}
               </p>
 
               <p className="mt-3 line-clamp-2 text-xs text-ink-500">
@@ -119,7 +157,66 @@ export default async function AdminPickupsPage() {
             </Card>
           ))}
         </CardGrid>
+      ) : (
+        <DataTable columns={COLUMNS} minWidth="60rem">
+          {pickups.map((pickup) => (
+            <TableRow key={pickup.id}>
+              <td className="px-4 py-3">
+                <Link
+                  href={`/admin/orders/${pickup.orderId}`}
+                  className="font-medium text-brand-700 hover:text-brand-800"
+                >
+                  {pickup.order.number}
+                </Link>
+              </td>
+              <td className="px-4 py-3">
+                <p className="text-ink-900">{pickup.order.customer.name}</p>
+                {pickup.order.customer.phone && (
+                  <p className="text-xs text-ink-500">
+                    {pickup.order.customer.phone}
+                  </p>
+                )}
+              </td>
+              <td className="max-w-64 truncate px-4 py-3 text-ink-500">
+                {placeOf(pickup)}
+              </td>
+              <td className="px-4 py-3 text-ink-700">
+                {formatDate(pickup.scheduledFor)}
+                {pickup.assignedTo && (
+                  <span className="block text-xs text-ink-500">
+                    {pickup.assignedTo}
+                  </span>
+                )}
+              </td>
+              <td className="px-4 py-3 text-right tabular-nums text-ink-700">
+                {pickup.routeSequence ?? "—"}
+              </td>
+              <td className="px-4 py-3">
+                <Badge tone={STATUS_TONE[pickup.status] ?? "neutral"}>
+                  {pickup.status.replace("_", " ").toLowerCase()}
+                </Badge>
+              </td>
+              <td className="px-4 py-3">
+                <div className="flex justify-end">
+                  <form action={confirmPickupAction}>
+                    <input type="hidden" name="orderId" value={pickup.orderId} />
+                    <Button type="submit" variant="soft" size="sm">
+                      Confirm
+                    </Button>
+                  </form>
+                </div>
+              </td>
+            </TableRow>
+          ))}
+        </DataTable>
       )}
+
+      <Pagination
+        meta={meta}
+        basePath="/admin/pickups"
+        params={{ view: view === "cards" ? "cards" : undefined }}
+        label="pickups"
+      />
     </div>
   );
 }

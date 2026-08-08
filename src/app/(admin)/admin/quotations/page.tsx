@@ -4,6 +4,12 @@ import { CheckCircle2, FileText, Send, XCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
+import { Pagination } from "@/components/ui/pagination";
+import { ViewToggle } from "@/components/ui/view-toggle";
+import { DataTable, EmptyState, TableRow } from "@/components/ui/data-table";
+import { Badge, type BadgeTone } from "@/components/ui/badge";
+import { pageMeta, resolvePage } from "@/lib/pagination";
+import { resolveView } from "@/lib/view-mode";
 import { DateRange } from "@/components/ui/date-range";
 import { DeleteButton } from "@/components/admin/delete-button";
 import { QuotationBuilder } from "@/components/admin/quotation-builder";
@@ -16,32 +22,52 @@ import {
 import { requireRole } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma";
 import { getActivePricelistId } from "@/server/services/catalog";
-import { cn, formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import type { RentalUnit } from "@/types";
 
 export const metadata: Metadata = { title: "Quotations" };
 
-const STATUS_STYLES: Record<string, string> = {
-  DRAFT: "bg-slate-100 text-slate-700",
-  SENT: "bg-brand-50 text-brand-700",
-  CONFIRMED: "bg-emerald-50 text-emerald-700",
-  CANCELLED: "bg-red-50 text-red-700",
+const STATUS_TONE: Record<string, BadgeTone> = {
+  DRAFT: "neutral",
+  SENT: "brand",
+  CONFIRMED: "success",
+  CANCELLED: "danger",
 };
 
-export default async function AdminQuotationsPage() {
+const COLUMNS = [
+  { key: "number", label: "Quotation" },
+  { key: "customer", label: "Customer" },
+  { key: "items", label: "Items" },
+  { key: "status", label: "Status" },
+  { key: "rent", label: "Rent", align: "right" as const },
+  { key: "deposit", label: "Deposit", align: "right" as const },
+  { key: "total", label: "Total", align: "right" as const },
+];
+
+export default async function AdminQuotationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string; page?: string }>;
+}) {
   await requireRole("ADMIN");
+  const { view: rawView, page } = await searchParams;
+  const view = resolveView(rawView);
+  const pageInfo = resolvePage(page);
 
   const pricelistId = await getActivePricelistId();
 
-  const [quotations, customers, products, periods] = await Promise.all([
+  const [quotations, total, customers, products, periods] = await Promise.all([
     prisma.quotation.findMany({
       orderBy: { createdAt: "desc" },
+      skip: pageInfo.skip,
+      take: pageInfo.take,
       include: {
         customer: { select: { name: true, email: true } },
         lines: { include: { product: { select: { name: true } } } },
         order: { select: { number: true } },
       },
     }),
+    prisma.quotation.count(),
     prisma.user.findMany({
       where: { role: "CUSTOMER", isActive: true },
       orderBy: { name: "asc" },
@@ -55,6 +81,8 @@ export default async function AdminQuotationsPage() {
     prisma.rentalPeriod.findMany({ where: { isActive: true }, orderBy: { id: "asc" } }),
   ]);
 
+  const meta = pageMeta(pageInfo, total);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -62,6 +90,7 @@ export default async function AdminQuotationsPage() {
         description="For walk-in customers: build a quotation, then confirm it to create the rental order, invoice and deposit in one step."
         actions={
           <>
+            <ViewToggle current={view} />
             <Link href="/admin/quotations/templates">
               <Button variant="secondary">Templates</Button>
             </Link>
@@ -88,20 +117,54 @@ export default async function AdminQuotationsPage() {
         }
       />
 
-      <div>
+      {total === 0 ? (
+        <EmptyState
+          icon={FileText}
+          title="No quotations yet"
+          description="Build one for a walk-in customer, then confirm it into a rental order."
+        />
+      ) : view === "table" ? (
+        <DataTable columns={COLUMNS} minWidth="60rem">
+          {quotations.map((q) => (
+            <TableRow key={q.id}>
+              <td className="px-4 py-3">
+                <p className="font-medium text-ink-900">{q.number}</p>
+                {q.order && (
+                  <p className="text-xs text-ink-500">Order {q.order.number}</p>
+                )}
+              </td>
+              <td className="px-4 py-3">
+                <p className="text-ink-900">{q.customer.name}</p>
+                <p className="truncate text-xs text-ink-500">
+                  {q.customer.email}
+                </p>
+              </td>
+              <td className="max-w-56 truncate px-4 py-3 text-ink-500">
+                {q.lines.map((l) => `${l.product.name} x${l.quantity}`).join(", ")}
+              </td>
+              <td className="px-4 py-3">
+                <Badge tone={STATUS_TONE[q.status] ?? "neutral"}>
+                  {q.status.toLowerCase()}
+                </Badge>
+              </td>
+              <td className="px-4 py-3 text-right tabular-nums text-ink-700">
+                {formatCurrency(Number(q.subtotal))}
+              </td>
+              <td className="px-4 py-3 text-right tabular-nums text-ink-700">
+                {formatCurrency(Number(q.depositTotal))}
+              </td>
+              <td className="px-4 py-3 text-right font-medium tabular-nums text-ink-900">
+                {formatCurrency(Number(q.total))}
+              </td>
+            </TableRow>
+          ))}
+        </DataTable>
+      ) : (
         <div className="space-y-3">
-          {quotations.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
-              <p className="inline-flex items-center gap-2 text-sm text-ink-500">
-                <FileText className="size-4" aria-hidden />
-                No quotations yet. Build one on the right.
-              </p>
-            </div>
-          ) : (
-            quotations.map((q) => (
+          {quotations.map((q) => (
               <div
                 key={q.id}
-                className="rounded-xl border border-slate-200 bg-white p-5"
+                className="rounded-2xl border border-line bg-surface p-5 shadow-card"
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -109,14 +172,9 @@ export default async function AdminQuotationsPage() {
                       <span className="font-semibold text-ink-900">
                         {q.number}
                       </span>
-                      <span
-                        className={cn(
-                          "rounded-full px-2.5 py-0.5 text-xs font-medium",
-                          STATUS_STYLES[q.status]
-                        )}
-                      >
+                      <Badge tone={STATUS_TONE[q.status] ?? "neutral"}>
                         {q.status.toLowerCase()}
-                      </span>
+                      </Badge>
                       {q.order && (
                         <span className="text-xs text-ink-500">
                           Order {q.order.number}
@@ -162,7 +220,7 @@ export default async function AdminQuotationsPage() {
                 </div>
 
                 {q.status !== "CONFIRMED" && q.status !== "CANCELLED" && (
-                  <div className="mt-4 flex flex-wrap items-center gap-1 border-t border-slate-100 pt-3">
+                  <div className="mt-4 flex flex-wrap items-center gap-1 border-t border-line pt-3">
                     {q.status === "DRAFT" && (
                       <form action={sendQuotationAction}>
                         <input type="hidden" name="id" value={q.id} />
@@ -199,10 +257,16 @@ export default async function AdminQuotationsPage() {
                   </div>
                 )}
               </div>
-            ))
-          )}
+          ))}
         </div>
-      </div>
+      )}
+
+      <Pagination
+        meta={meta}
+        basePath="/admin/quotations"
+        params={{ view: view === "cards" ? "cards" : undefined }}
+        label="quotations"
+      />
     </div>
   );
 }

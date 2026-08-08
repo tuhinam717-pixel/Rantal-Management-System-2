@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable, EmptyState, TableRow } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
+import { Pagination } from "@/components/ui/pagination";
+import { pageMeta, resolvePage } from "@/lib/pagination";
 import { DeleteButton } from "@/components/admin/delete-button";
 import { NewRentalPeriodDialog } from "@/components/admin/new-rental-period-form";
 import {
@@ -26,13 +28,27 @@ const COLUMNS = [
   { key: "actions", label: "", align: "right" as const },
 ];
 
-export default async function AdminRentalPeriodsPage() {
+export default async function AdminRentalPeriodsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
   await requireRole("ADMIN");
+  const pageInfo = resolvePage((await searchParams).page);
 
-  const periods = await prisma.rentalPeriod.findMany({
-    orderBy: { createdAt: "asc" },
-    include: { _count: { select: { pricelistItems: true, orderLines: true } } },
-  });
+  const [periods, total] = await Promise.all([
+    prisma.rentalPeriod.findMany({
+      orderBy: { createdAt: "asc" },
+      skip: pageInfo.skip,
+      take: pageInfo.take,
+      include: {
+        _count: { select: { pricelistItems: true, orderLines: true } },
+      },
+    }),
+    prisma.rentalPeriod.count(),
+  ]);
+
+  const meta = pageMeta(pageInfo, total);
 
   return (
     <div className="space-y-6">
@@ -63,11 +79,11 @@ export default async function AdminRentalPeriodsPage() {
                 {period.duration} {period.unit.toLowerCase()}
                 {period.duration === 1 ? "" : "s"}
               </td>
-              <td className="px-4 py-3 text-right text-ink-500">
+              <td className="px-4 py-3 text-right tabular-nums text-ink-500">
                 {period._count.pricelistItems}
               </td>
-              <td className="px-4 py-3 text-right text-ink-500">
-                {period._count.orderLines} orders
+              <td className="px-4 py-3 text-right tabular-nums text-ink-500">
+                {period._count.orderLines}
               </td>
               <td className="px-4 py-3">
                 <Badge tone={period.isActive ? "success" : "neutral"}>
@@ -105,6 +121,8 @@ export default async function AdminRentalPeriodsPage() {
           ))}
         </DataTable>
       )}
+
+      <Pagination meta={meta} basePath="/admin/rental-periods" label="periods" />
     </div>
   );
 }

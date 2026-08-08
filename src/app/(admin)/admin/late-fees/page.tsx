@@ -11,6 +11,8 @@ import {
   TableRow,
 } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
+import { Pagination } from "@/components/ui/pagination";
+import { pageMeta, resolvePage } from "@/lib/pagination";
 import { DeleteButton } from "@/components/admin/delete-button";
 import { LateFeeRuleDialog } from "@/components/admin/late-fee-rule-form";
 import { deleteLateFeeRuleAction } from "@/app/(admin)/admin/config-actions";
@@ -37,27 +39,38 @@ const COLUMNS = [
   { key: "amount", label: "Amount", align: "right" as const },
 ];
 
-export default async function AdminLateFeesPage() {
+export default async function AdminLateFeesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
   await requireRole("ADMIN");
+  const pageInfo = resolvePage((await searchParams).page);
 
-  const [rules, fees] = await Promise.all([
+  const [rules, fees, feeCount, charged] = await Promise.all([
     prisma.lateFeeRule.findMany({ orderBy: { createdAt: "asc" } }),
     prisma.lateFee.findMany({
       orderBy: { calculatedAt: "desc" },
+      skip: pageInfo.skip,
+      take: pageInfo.take,
       include: {
         order: { include: { customer: { select: { name: true } } } },
         rule: true,
       },
     }),
+    prisma.lateFee.count(),
+    // Sum across all charges, not just the page being viewed.
+    prisma.lateFee.aggregate({ _sum: { amount: true } }),
   ]);
 
-  const total = fees.reduce((sum, f) => sum + Number(f.amount), 0);
+  const meta = pageMeta(pageInfo, feeCount);
+  const total = Number(charged._sum.amount ?? 0);
 
   return (
     <div className="space-y-8">
       <PageHeader
         title="Late return fees"
-        description={`${fees.length} charged · ${formatCurrency(total)} in total`}
+        description={`${feeCount} charged · ${formatCurrency(total)} in total`}
         actions={<LateFeeRuleDialog />}
       />
 
@@ -152,7 +165,7 @@ export default async function AdminLateFeesPage() {
       <section className="space-y-4">
         <h2 className="text-sm font-semibold text-ink-900">Charges raised</h2>
 
-        {fees.length === 0 ? (
+        {feeCount === 0 ? (
           <EmptyState
             icon={ShieldAlert}
             title="No late fees charged yet"
@@ -180,13 +193,15 @@ export default async function AdminLateFeesPage() {
                     {fee.status.replace(/_/g, " ").toLowerCase()}
                   </Badge>
                 </td>
-                <td className="px-4 py-3 text-right font-semibold text-ink-900">
+                <td className="px-4 py-3 text-right font-semibold tabular-nums text-ink-900">
                   {formatCurrency(Number(fee.amount))}
                 </td>
               </TableRow>
             ))}
           </DataTable>
         )}
+
+        <Pagination meta={meta} basePath="/admin/late-fees" label="charges" />
       </section>
     </div>
   );
