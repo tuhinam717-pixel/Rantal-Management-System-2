@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: rental-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: rental
+      POSTGRES_PASSWORD: rental
+      POSTGRES_DB: rental_management
+    # Host port 5433: a local PostgreSQL install already owns 5432.
+    ports:
+      - "5433:5432"
+    volumes:
+      - rental-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rental -d rental_management"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  rental-pgdata:

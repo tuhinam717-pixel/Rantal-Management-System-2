@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-50: #eef4ff;
+  --color-brand-100: #d9e5ff;
+  --color-brand-200: #bcd1ff;
+  --color-brand-300: #8eb3ff;
+  --color-brand-400: #598aff;
+  --color-brand-500: #3361ff;
+  --color-brand-600: #1d3ff5;
+  --color-brand-700: #172fe1;
+  --color-brand-800: #1a29b6;
+  --color-brand-900: #1b2a8f;
+
+  --color-ink-500: #64748b;
+  --color-ink-700: #334155;
+  --color-ink-900: #0f172a;
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #0f172a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0b1120;
+    --foreground: #e2e8f0;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Auth screens sit on this slow-drifting gradient. */
+@keyframes aurora {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(0, -3%, 0) scale(1.08);
+  }
+}
+
+.animate-aurora {
+  animation: aurora 14s ease-in-out infinite;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.5s ease-out both;
+}
