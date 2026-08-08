@@ -11,7 +11,7 @@ export default async function PortalDashboardPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-ink-900">
-          Hi {user.name.split(" ")[0]} 👋
+          Hi {user.name.split(" ")[0]}
         </h1>
         <p className="mt-1 text-sm text-ink-500">
           You are signed in as a portal user. Your rentals, addresses and

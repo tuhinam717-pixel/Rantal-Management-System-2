@@ -24,3 +24,32 @@ export const ADMIN_PREFIXES = ["/admin"];
 
 /** Auth screens an already-signed-in user should be bounced away from. */
 export const AUTH_ROUTES = ["/login", "/signup", "/forgot-password"];
+
+/**
+ * Demo quick-login is opt-in and off by default.
+ *
+ * Set NEXT_PUBLIC_ENABLE_DEMO_LOGIN=true in .env for local demos only. Without
+ * it the login page never renders credentials, so a deployed build can't leak
+ * working accounts to anyone who opens the page.
+ */
+export const DEMO_LOGIN_ENABLED =
+  process.env.NEXT_PUBLIC_ENABLE_DEMO_LOGIN === "true";
+
+export const DEMO_ACCOUNTS = DEMO_LOGIN_ENABLED
+  ? [
+      {
+        role: "ADMIN" as const,
+        label: "Admin",
+        hint: "Dashboard, pickups, returns, deposits",
+        email: "admin@rentflow.test",
+        password: "Admin@123",
+      },
+      {
+        role: "CUSTOMER" as const,
+        label: "Customer",
+        hint: "Browse, rent, track orders",
+        email: "customer@rentflow.test",
+        password: "Customer@123",
+      },
+    ]
+  : [];

@@ -3,6 +3,7 @@
 import { forwardRef, useId, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 
+import { controlClass } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
 
 export interface InputProps
@@ -14,7 +15,10 @@ export interface InputProps
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, label, error, hint, icon, id, type = "text", ...props }, ref) => {
+  (
+    { className, label, error, hint, icon, id, type = "text", required, ...props },
+    ref
+  ) => {
     const generatedId = useId();
     const inputId = id ?? generatedId;
     const describedBy = error
@@ -32,16 +36,21 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="block text-sm font-medium text-ink-700"
+            className="flex items-center gap-1 text-sm font-medium text-ink-700"
           >
             {label}
+            {required && (
+              <span className="text-brand-600" aria-hidden>
+                *
+              </span>
+            )}
           </label>
         )}
 
         <div className="relative">
           {icon && (
             <span
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-400"
               aria-hidden
             >
               {icon}
@@ -52,18 +61,15 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             id={inputId}
             ref={ref}
             type={resolvedType}
+            required={required}
             aria-invalid={Boolean(error) || undefined}
             aria-describedby={describedBy}
             className={cn(
-              "block w-full rounded-lg border-0 bg-white py-2.5 text-ink-900 shadow-sm",
-              "ring-1 ring-inset ring-slate-300 placeholder:text-slate-400",
-              "focus:ring-2 focus:ring-inset focus:ring-brand-600",
-              "disabled:cursor-not-allowed disabled:bg-slate-50",
-              "text-sm transition",
+              controlClass,
+              "py-2.5",
               icon ? "pl-10" : "pl-3.5",
               isPassword ? "pr-11" : "pr-3.5",
-              error &&
-                "ring-red-400 focus:ring-red-500 text-red-900 placeholder:text-red-300",
+              error && "ring-red-300 focus:ring-red-500 text-red-900",
               className
             )}
             {...props}
@@ -73,7 +79,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             <button
               type="button"
               onClick={() => setRevealed((v) => !v)}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:text-ink-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-600"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-brand-50 hover:text-ink-700"
               aria-label={revealed ? "Hide password" : "Show password"}
               tabIndex={-1}
             >
@@ -87,7 +93,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         </div>
 
         {error ? (
-          <p id={`${inputId}-error`} className="text-xs text-red-600">
+          <p id={`${inputId}-error`} className="text-xs font-medium text-red-600">
             {error}
           </p>
         ) : hint ? (

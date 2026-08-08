@@ -1,38 +1,53 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand-50: #eef4ff;
-  --color-brand-100: #d9e5ff;
-  --color-brand-200: #bcd1ff;
-  --color-brand-300: #8eb3ff;
-  --color-brand-400: #598aff;
-  --color-brand-500: #3361ff;
-  --color-brand-600: #1d3ff5;
-  --color-brand-700: #172fe1;
-  --color-brand-800: #1a29b6;
-  --color-brand-900: #1b2a8f;
+  /*
+    Brand scale built around #caf1de (brand-200), the requested mint.
+    The light steps are for tints and surfaces; 600/700 are deliberately much
+    darker so white text on a brand button clears WCAG AA (#1a8464 on white is
+    ~4.8:1). Using the mint itself for buttons would fail contrast badly.
+  */
+  --color-brand-50: #f1fbf6;
+  --color-brand-100: #dff6ec;
+  --color-brand-200: #caf1de;
+  --color-brand-300: #9fe3c6;
+  --color-brand-400: #66cea6;
+  --color-brand-500: #33b287;
+  --color-brand-600: #1a8464;
+  --color-brand-700: #146b52;
+  --color-brand-800: #135442;
+  --color-brand-900: #114537;
 
-  --color-ink-500: #64748b;
-  --color-ink-700: #334155;
-  --color-ink-900: #0f172a;
+  /* Text greys carry a hint of green so they sit with the mint. */
+  --color-ink-400: #8b9a94;
+  --color-ink-500: #64756e;
+  --color-ink-700: #33463f;
+  --color-ink-900: #0f1f1a;
+
+  /* Hairlines and page ground. */
+  --color-surface: #ffffff;
+  --color-canvas: #f6faf8;
+  --color-line: #e3ece8;
+
+  --shadow-card: 0 1px 2px 0 rgb(17 69 55 / 0.04), 0 1px 3px 0 rgb(17 69 55 / 0.06);
+  --shadow-lift: 0 4px 12px -2px rgb(17 69 55 / 0.10), 0 2px 6px -2px rgb(17 69 55 / 0.06);
 }
 
 :root {
-  --background: #ffffff;
-  --foreground: #0f172a;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0b1120;
-    --foreground: #e2e8f0;
-  }
+  --background: var(--color-canvas);
+  --foreground: var(--color-ink-900);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   -webkit-font-smoothing: antialiased;
+}
+
+/* Consistent focus ring across native controls we don't wrap in a component. */
+*:focus-visible {
+  outline: 2px solid var(--color-brand-600);
+  outline-offset: 2px;
 }
 
 /* Auth screens sit on this slow-drifting gradient. */
@@ -63,4 +78,21 @@ body {
 
 .animate-fade-up {
   animation: fade-up 0.5s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-aurora,
+  .animate-fade-up {
+    animation: none;
+  }
+}
+
+/* Tables scroll inside their own container; the page never scrolls sideways. */
+.scroll-shadow {
+  background:
+    linear-gradient(to right, var(--color-surface) 30%, rgb(255 255 255 / 0)) left / 40px 100% no-repeat,
+    linear-gradient(to left, var(--color-surface) 30%, rgb(255 255 255 / 0)) right / 40px 100% no-repeat,
+    radial-gradient(farthest-side at 0 50%, rgb(17 69 55 / 0.08), transparent) left / 14px 100% no-repeat,
+    radial-gradient(farthest-side at 100% 50%, rgb(17 69 55 / 0.08), transparent) right / 14px 100% no-repeat;
+  background-attachment: local, local, scroll, scroll;
 }

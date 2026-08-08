@@ -73,6 +73,11 @@ npm run dev
 
 Open http://localhost:3000 — the splash screen hands off to the login page.
 
+The login page has **one-click demo sign-in buttons** for both roles, so you
+never need to look these up. Remove `DEMO_ACCOUNTS` in `src/lib/constants.ts`
+and its panel in `login-form.tsx` before any real deploy — it publishes working
+credentials to anyone who opens the page.
+
 ### Demo accounts (created by the seed)
 
 | Role     | Email                    | Password       |
@@ -91,6 +96,8 @@ Open http://localhost:3000 — the splash screen hands off to the login page.
 | `npm run db:migrate` | Create a migration                  |
 | `npm run db:studio`  | Prisma Studio                       |
 | `npm run db:seed`    | Seed demo data                      |
+| `npm run verify`     | Pricing, checkout, return + settlement |
+| `npm run verify:crud` | Admin create/edit/delete paths       |
 
 ## Project structure
 
@@ -179,9 +186,60 @@ Covers all five modules from the brief:
 
 ## Status
 
-Done: project structure, full Prisma schema, auth (splash, login, signup,
-logout, session, middleware guards, role routing), portal and admin shells.
+**Working end to end:**
 
-Next: catalogue and cart, checkout with deposit collection, quotation builder,
-pickup/return workflows, late-fee engine, and wiring the dashboard KPIs to
-live queries.
+- Auth — splash, login, signup, logout, session, middleware guards, role routing
+- Pricing engine — billable units, pricelist resolution, fixed/percentage
+  deposits, late fees with grace period and cap, deposit settlement
+- Catalogue — 8 seeded products, category filter, search, product detail with
+  rental-period and date selection
+- Cart — add / update quantity / remove, live rent-vs-deposit split
+- Checkout — delivery or store pickup, payment, and a single transaction that
+  creates the order, lines, security deposit + opening ledger entry, rent and
+  deposit payments, the invoice, the pickup and return schedules, reserves
+  stock and empties the cart
+- Orders — list, detail with deposit history, printable invoice
+- Admin dashboard — all eight KPI tiles plus overdue / today's pickups /
+  today's returns queues, from live queries
+- Admin operations — rental orders with status filters, pickup schedule with
+  route sequence and confirmation, return schedule with inspection and
+  one-click settlement, deposit ledger, late-fee rules and charges
+- Return settlement — overdue detection, penalty from the active late-fee rule,
+  deduction from the deposit, cash refund of the balance, stock released, and a
+  shortfall invoice when the penalty exceeds the deposit
+
+`npm run verify` runs 40 assertions covering the pricing maths, a real checkout,
+overdue detection and both settlement paths (late and on-time) against the
+database. **It mutates data** — run `npm run db:seed` afterwards for a clean
+demo state.
+
+**Icons, not emoji.** The UI uses `lucide-react` components throughout; there
+are no emoji or arrow glyphs in any rendered screen.
+
+**Admin configuration (full create / edit / delete):**
+
+- Products — create, edit, retire or delete, with fixed or percentage deposits
+  and rates per rental period. A product with rental history is retired rather
+  than deleted, so order records stay intact.
+- Variants — add and remove brand / manufacturer / colour / size rows
+- Pricelists — create time-bound lists, switch the default, activate and
+  deactivate, and edit the whole product x period rate grid in one submit. The
+  default list cannot be deleted, since that would leave the catalogue priced
+  at nothing.
+- Rental periods — create custom blocks (e.g. a 3-day weekend), toggle, delete;
+  ones referenced by orders are deactivated instead
+- Quotations — walk-in builder with live totals, then **confirm to create the
+  order, deposit, payments, invoice and pickup/return schedule in one step**
+- Quotation templates — header, footer and terms, with a default
+- Late-fee rules — rate per hour/day/week/month, grace period, optional cap
+- Org settings — company, currency, default deposit, grace hours, quotation
+  validity
+- Customers — records with rental counts, lifetime value and overdue flags
+
+The admin console has its own dark-rail layout and grouped navigation
+(Operations / Money / Configuration) so it is never mistaken for the customer
+portal.
+
+**Not built yet:** customer profile and address management, barcode/QR
+scanning, and notifications. These are broken into small tickets in
+[`docs/FRONTEND-TASKS.md`](docs/FRONTEND-TASKS.md).

@@ -13,6 +13,8 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
+    "verify": "tsx --conditions=react-server scripts/verify-flow.ts",
+    "verify:crud": "tsx --conditions=react-server scripts/verify-crud.ts",
     "postinstall": "prisma generate"
   },
   "prisma": {
@@ -29,6 +31,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.54.2",
+    "server-only": "^0.0.1",
     "tailwind-merge": "^2.6.0",
     "zod": "^3.24.1"
   },
