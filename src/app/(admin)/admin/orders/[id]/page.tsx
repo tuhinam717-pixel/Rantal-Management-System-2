@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { DateRange } from "@/components/ui/date-range";
 import { StatusBadge } from "@/components/orders/status-badge";
 import { ReturnForm } from "@/components/pickup-return/return-form";
+import { OrderQrCode } from "@/components/scan/qr-code";
 import { confirmPickupAction } from "@/app/(admin)/admin/actions";
 import { requireRole } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma";
@@ -346,6 +347,18 @@ export default async function AdminOrderDetailPage({
               </div>
             </dl>
           </div>
+
+          {!settled && (
+            <div className="rounded-2xl border border-line bg-surface p-5 text-center shadow-card">
+              <h2 className="text-sm font-semibold text-ink-900">Scan code</h2>
+              <p className="mt-1 text-xs text-ink-500">
+                Same code as on the customer&apos;s invoice.
+              </p>
+              <div className="mt-3 flex justify-center">
+                <OrderQrCode orderNumber={order.number} size={132} />
+              </div>
+            </div>
+          )}
 
           {order.invoices.length > 0 && (
             <div className="rounded-xl border border-slate-200 bg-white p-5">

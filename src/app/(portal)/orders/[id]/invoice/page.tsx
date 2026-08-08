@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 
 import { PrintButton } from "@/components/orders/print-button";
 import { DateRange } from "@/components/ui/date-range";
+import { OrderQrCode } from "@/components/scan/qr-code";
 import { requireUser } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma";
 import { getOrderForCustomer } from "@/server/services/orders";
@@ -76,19 +77,24 @@ export default async function InvoicePage({
             )}
           </div>
 
-          <div className="sm:text-right">
-            <h2 className="text-xs font-medium uppercase tracking-wide text-ink-500">
-              Rental period
-            </h2>
-            <DateRange
-              from={order.rentalStart}
-              to={order.rentalEnd}
-              className="mt-2 text-sm text-ink-900"
-            />
-            <p className="mt-2 text-sm text-ink-500">
-              Order {order.number} ·{" "}
-              {order.fulfilment === "DELIVERY" ? "Delivery" : "Store pickup"}
-            </p>
+          <div className="flex gap-6 sm:justify-end">
+            <div className="sm:text-right">
+              <h2 className="text-xs font-medium uppercase tracking-wide text-ink-500">
+                Rental period
+              </h2>
+              <DateRange
+                from={order.rentalStart}
+                to={order.rentalEnd}
+                className="mt-2 text-sm text-ink-900"
+              />
+              <p className="mt-2 text-sm text-ink-500">
+                Order {order.number} ·{" "}
+                {order.fulfilment === "DELIVERY" ? "Delivery" : "Store pickup"}
+              </p>
+            </div>
+
+            {/* Scanned at handover and return, so bring this to the store. */}
+            <OrderQrCode orderNumber={order.number} size={104} />
           </div>
         </section>
 

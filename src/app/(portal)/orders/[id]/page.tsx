@@ -6,6 +6,7 @@ import { ChevronLeft, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/orders/status-badge";
 import { DateRange } from "@/components/ui/date-range";
+import { OrderQrCode } from "@/components/scan/qr-code";
 import { requireUser } from "@/lib/auth/current-user";
 import { getOrderForCustomer } from "@/server/services/orders";
 import { formatCurrency } from "@/lib/utils";
@@ -198,9 +199,24 @@ export default async function OrderDetailPage({
           )}
 
           {invoice && (
-            <div className="rounded-xl border border-slate-200 bg-white p-5">
+            <div className="rounded-2xl border border-line bg-surface p-5 shadow-card">
               <h2 className="text-sm font-semibold text-ink-900">Invoice</h2>
               <p className="mt-1 text-sm text-ink-500">{invoice.number}</p>
+            </div>
+          )}
+
+          {order.status !== "COMPLETED" && order.status !== "CANCELLED" && (
+            <div className="rounded-2xl border border-line bg-surface p-5 text-center shadow-card">
+              <h2 className="text-sm font-semibold text-ink-900">
+                Pickup &amp; return code
+              </h2>
+              <p className="mt-1 text-xs text-ink-500">
+                Show this at the store. Staff scan it to hand over the product
+                and again when you bring it back.
+              </p>
+              <div className="mt-3 flex justify-center">
+                <OrderQrCode orderNumber={order.number} size={148} />
+              </div>
             </div>
           )}
         </aside>

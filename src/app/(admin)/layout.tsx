@@ -7,6 +7,7 @@ import {
   FileSpreadsheet,
   LayoutDashboard,
   PackageCheck,
+  ScanLine,
   ScrollText,
   Settings,
   ShieldCheck,
@@ -31,6 +32,7 @@ const NAV_GROUPS = [
       { href: "/admin/orders", label: "Rental orders", icon: ScrollText },
       { href: "/admin/pickups", label: "Pickups", icon: Truck },
       { href: "/admin/returns", label: "Returns", icon: Undo2 },
+      { href: "/admin/scan", label: "Scan", icon: ScanLine },
     ],
   },
   {
