@@ -91,37 +91,43 @@ async function main() {
     },
   });
 
+  // Parallel on purpose: against a remote database each round trip costs
+  // ~250ms, and doing this serially made the seed take minutes.
   const customers = new Map<string, string>();
-  for (const c of CUSTOMERS) {
-    const user = await prisma.user.upsert({
-      where: { email: c.email },
-      update: { name: c.name, phone: c.phone },
-      create: {
-        name: c.name,
-        email: c.email,
-        phone: c.phone,
-        passwordHash: await bcrypt.hash(c.password, 12),
-        role: "CUSTOMER",
-        cart: { create: {} },
-      },
-    });
-    customers.set(c.email, user.id);
+  const customerRows = await Promise.all(
+    CUSTOMERS.map(async (c, index) => {
+      const user = await prisma.user.upsert({
+        where: { email: c.email },
+        update: { name: c.name, phone: c.phone },
+        create: {
+          name: c.name,
+          email: c.email,
+          phone: c.phone,
+          passwordHash: await bcrypt.hash(c.password, 12),
+          role: "CUSTOMER",
+          cart: { create: {} },
+        },
+      });
 
-    await prisma.address.upsert({
-      where: { id: `addr-${user.id}` },
-      update: {},
-      create: {
-        id: `addr-${user.id}`,
-        userId: user.id,
-        label: "Home",
-        line1: `${10 + customers.size} Residency Road`,
-        city: "Bengaluru",
-        state: "Karnataka",
-        postalCode: "560025",
-        isDefault: true,
-      },
-    });
-  }
+      await prisma.address.upsert({
+        where: { id: `addr-${user.id}` },
+        update: {},
+        create: {
+          id: `addr-${user.id}`,
+          userId: user.id,
+          label: "Home",
+          line1: `${11 + index} Residency Road`,
+          city: "Bengaluru",
+          state: "Karnataka",
+          postalCode: "560025",
+          isDefault: true,
+        },
+      });
+
+      return [c.email, user.id] as const;
+    })
+  );
+  for (const [email, id] of customerRows) customers.set(email, id);
 
   // ---- org config --------------------------------------------------------
   await prisma.orgSettings.upsert({
@@ -151,27 +157,36 @@ async function main() {
     },
   });
 
-  // ---- rental periods ----------------------------------------------------
-  const periods = new Map<RentalUnit, { id: string; duration: number }>();
-  for (const period of PERIODS) {
-    const row = await prisma.rentalPeriod.upsert({
-      where: { unit_duration: { unit: period.unit, duration: period.duration } },
-      update: {},
-      create: period,
-    });
-    periods.set(period.unit, { id: row.id, duration: row.duration });
-  }
+  // ---- rental periods and categories (independent, so run together) ------
+  const [periodRows, categoryRows] = await Promise.all([
+    Promise.all(
+      PERIODS.map((period) =>
+        prisma.rentalPeriod.upsert({
+          where: {
+            unit_duration: { unit: period.unit, duration: period.duration },
+          },
+          update: {},
+          create: period,
+        })
+      )
+    ),
+    Promise.all(
+      CATEGORIES.map((category) =>
+        prisma.category.upsert({
+          where: { slug: category.slug },
+          update: {},
+          create: category,
+        })
+      )
+    ),
+  ]);
 
-  // ---- categories --------------------------------------------------------
-  const categories = new Map<string, string>();
-  for (const category of CATEGORIES) {
-    const row = await prisma.category.upsert({
-      where: { slug: category.slug },
-      update: {},
-      create: category,
-    });
-    categories.set(category.slug, row.id);
-  }
+  const periods = new Map<RentalUnit, { id: string; duration: number }>(
+    periodRows.map((r) => [r.unit, { id: r.id, duration: r.duration }])
+  );
+  const categories = new Map<string, string>(
+    categoryRows.map((r) => [r.slug, r.id])
+  );
 
   // ---- pricelists --------------------------------------------------------
   // `update` repeats the flags on purpose: reseeding should repair the
@@ -206,57 +221,62 @@ async function main() {
   const productIds = new Map<string, string>();
   const productPrice = new Map<string, Map<RentalUnit, number>>();
 
-  for (const item of PRODUCTS) {
-    const product = await prisma.product.upsert({
-      where: { slug: item.slug },
-      update: { totalStock: item.totalStock, reservedStock: 0 },
-      create: {
-        name: item.name,
-        slug: item.slug,
-        sku: item.sku,
-        description: item.description,
-        imageUrl: item.imageUrl,
-        categoryId: categories.get(item.category),
-        totalStock: item.totalStock,
-        depositType: item.depositType ?? "FIXED",
-        depositValue: item.depositValue,
-      },
-    });
-
-    productIds.set(item.slug, product.id);
-    productPrice.set(
-      item.slug,
-      new Map(Object.entries(item.prices) as [RentalUnit, number][])
-    );
-
-    for (const variant of item.variants) {
-      await prisma.productVariant.upsert({
-        where: { sku: variant.sku },
-        update: {},
-        create: { ...variant, productId: product.id },
-      });
-    }
-
-    for (const [unit, price] of Object.entries(item.prices)) {
-      const period = periods.get(unit as RentalUnit)!;
-      await prisma.pricelistItem.upsert({
-        where: {
-          pricelistId_productId_rentalPeriodId: {
-            pricelistId: pricelist.id,
-            productId: product.id,
-            rentalPeriodId: period.id,
-          },
-        },
-        update: { price },
+  // Each product's own writes stay ordered, but products run concurrently:
+  // 24 products x 6 statements serially is ~150 round trips.
+  await Promise.all(
+    PRODUCTS.map(async (item) => {
+      const product = await prisma.product.upsert({
+        where: { slug: item.slug },
+        update: { totalStock: item.totalStock, reservedStock: 0 },
         create: {
-          pricelistId: pricelist.id,
-          productId: product.id,
-          rentalPeriodId: period.id,
-          price,
+          name: item.name,
+          slug: item.slug,
+          sku: item.sku,
+          description: item.description,
+          imageUrl: item.imageUrl,
+          categoryId: categories.get(item.category),
+          totalStock: item.totalStock,
+          depositType: item.depositType ?? "FIXED",
+          depositValue: item.depositValue,
         },
       });
-    }
-  }
+
+      productIds.set(item.slug, product.id);
+      productPrice.set(
+        item.slug,
+        new Map(Object.entries(item.prices) as [RentalUnit, number][])
+      );
+
+      await Promise.all([
+        ...item.variants.map((variant) =>
+          prisma.productVariant.upsert({
+            where: { sku: variant.sku },
+            update: {},
+            create: { ...variant, productId: product.id },
+          })
+        ),
+        ...Object.entries(item.prices).map(([unit, price]) => {
+          const period = periods.get(unit as RentalUnit)!;
+          return prisma.pricelistItem.upsert({
+            where: {
+              pricelistId_productId_rentalPeriodId: {
+                pricelistId: pricelist.id,
+                productId: product.id,
+                rentalPeriodId: period.id,
+              },
+            },
+            update: { price },
+            create: {
+              pricelistId: pricelist.id,
+              productId: product.id,
+              rentalPeriodId: period.id,
+              price,
+            },
+          });
+        }),
+      ]);
+    })
+  );
 
   // ---- demo rental orders ------------------------------------------------
   const HOURS_PER_UNIT: Record<RentalUnit, number> = {

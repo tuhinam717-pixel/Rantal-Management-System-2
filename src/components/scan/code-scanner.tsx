@@ -1,14 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, CameraOff, Keyboard, Loader2 } from "lucide-react";
+import { Camera, Keyboard, Loader2, ScanLine } from "lucide-react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { parseScanCode } from "@/lib/rental/scan-code";
 
-/** Minimal shape of the BarcodeDetector API we rely on. */
+/** Minimal shape of the native BarcodeDetector API. */
 interface DetectedBarcode {
   rawValue: string;
 }
@@ -30,9 +30,14 @@ function getDetectorCtor(): BarcodeDetectorCtor | null {
 /**
  * Camera scanner with a typed fallback.
  *
- * Uses the native BarcodeDetector where it exists (Chrome/Edge on desktop and
- * Android). Safari and Firefox don't ship it, and camera access needs HTTPS,
- * so manual entry is always available rather than being a dead end.
+ * Two decoding paths, because the native BarcodeDetector only exists in
+ * Chromium: it is used when present (fastest, hardware-accelerated), and
+ * everywhere else — notably Safari on iPhone — frames are decoded with jsQR,
+ * loaded on demand so Chromium users never download it.
+ *
+ * Camera access also requires HTTPS, so typing the order number stays
+ * available regardless. A USB/Bluetooth scanner gun works through that same
+ * field: those behave as keyboards and press Enter, which submits the form.
  */
 export function CodeScanner({
   onCode,
@@ -42,15 +47,21 @@ export function CodeScanner({
   isBusy?: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
+  const manualRef = useRef<HTMLInputElement>(null);
 
   const [scanning, setScanning] = useState(false);
+  const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [manual, setManual] = useState("");
-  const [supported, setSupported] = useState<boolean | null>(null);
+  const [engine, setEngine] = useState<"native" | "jsqr" | null>(null);
 
-  useEffect(() => setSupported(getDetectorCtor() !== null), []);
+  // Focus the manual field on mount so a scanner gun works without a click.
+  useEffect(() => {
+    manualRef.current?.focus();
+  }, []);
 
   const stop = useCallback(() => {
     if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
@@ -62,16 +73,20 @@ export function CodeScanner({
 
   useEffect(() => stop, [stop]);
 
+  const handleHit = useCallback(
+    (raw: string) => {
+      const parsed = parseScanCode(raw);
+      if (!parsed) return false;
+      stop();
+      onCode(parsed);
+      return true;
+    },
+    [onCode, stop]
+  );
+
   async function start() {
     setError(null);
-
-    const Detector = getDetectorCtor();
-    if (!Detector) {
-      setError(
-        "This browser has no barcode support. Use Chrome or Edge, or type the order number below."
-      );
-      return;
-    }
+    setStarting(true);
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -85,33 +100,69 @@ export function CodeScanner({
       await video.play();
       setScanning(true);
 
-      const detector = new Detector({ formats: ["qr_code", "code_128"] });
+      const Detector = getDetectorCtor();
 
-      const tick = async () => {
-        if (!streamRef.current || !videoRef.current) return;
-        try {
-          const results = await detector.detect(videoRef.current);
-          const hit = results
-            .map((r) => parseScanCode(r.rawValue))
-            .find((v): v is string => Boolean(v));
+      if (Detector) {
+        setEngine("native");
+        const detector = new Detector({ formats: ["qr_code", "code_128"] });
 
-          if (hit) {
-            stop();
-            onCode(hit);
-            return;
+        const tick = async () => {
+          if (!streamRef.current || !videoRef.current) return;
+          try {
+            const results = await detector.detect(videoRef.current);
+            for (const r of results) {
+              if (handleHit(r.rawValue)) return;
+            }
+          } catch {
+            // A frame can fail to decode; keep going.
           }
-        } catch {
-          // A frame can fail to decode; keep going rather than tearing down.
+          rafRef.current = requestAnimationFrame(tick);
+        };
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
+      // Safari / Firefox: decode frames ourselves.
+      setEngine("jsqr");
+      const { default: jsQR } = await import("jsqr");
+      const canvas = canvasRef.current ?? document.createElement("canvas");
+      canvasRef.current = canvas;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+      const tick = () => {
+        const v = videoRef.current;
+        if (!streamRef.current || !v || !ctx) return;
+
+        if (v.readyState === v.HAVE_ENOUGH_DATA) {
+          // Cap the working size: decoding a full 1080p frame every tick is
+          // needlessly slow, and QR codes survive the downscale fine.
+          const scale = Math.min(1, 640 / (v.videoWidth || 640));
+          canvas.width = Math.round(v.videoWidth * scale);
+          canvas.height = Math.round(v.videoHeight * scale);
+          ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+
+          const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const found = jsQR(image.data, image.width, image.height, {
+            inversionAttempts: "dontInvert",
+          });
+
+          if (found?.data && handleHit(found.data)) return;
         }
         rafRef.current = requestAnimationFrame(tick);
       };
-
       rafRef.current = requestAnimationFrame(tick);
-    } catch {
+    } catch (err) {
       stop();
+      const denied =
+        err instanceof DOMException &&
+        (err.name === "NotAllowedError" || err.name === "SecurityError");
       setError(
-        "Could not open the camera. Check the browser's camera permission, or type the order number below."
+        denied
+          ? "Camera permission was blocked. Allow it in the address bar, or type the order number below."
+          : "Could not open the camera. It may be in use by another app, or this device has none. Type the order number below instead."
       );
+    } finally {
+      setStarting(false);
     }
   }
 
@@ -123,6 +174,7 @@ export function CodeScanner({
       return;
     }
     setError(null);
+    setManual("");
     onCode(parsed);
   }
 
@@ -139,47 +191,50 @@ export function CodeScanner({
         />
 
         {!scanning && (
-          <div className="absolute inset-0 grid place-items-center bg-ink-900/80 text-center">
+          <div className="absolute inset-0 grid place-items-center bg-ink-900/80 px-6 text-center">
             <div>
               <span className="mx-auto grid size-12 place-items-center rounded-full bg-white/10 text-white">
-                {supported === false ? (
-                  <CameraOff className="size-5" aria-hidden />
-                ) : (
-                  <Camera className="size-5" aria-hidden />
-                )}
+                <Camera className="size-5" aria-hidden />
               </span>
               <p className="mt-3 text-sm font-medium text-white">
-                {supported === false
-                  ? "Camera scanning not supported here"
-                  : "Point the camera at the order QR code"}
+                Point the camera at the order QR code
               </p>
               <p className="mt-1 text-xs text-slate-300">
-                {supported === false
-                  ? "Type the order number below instead."
-                  : "The code is on the invoice and the order page."}
+                Works on phone or laptop. The code is on the customer&apos;s
+                order page and invoice.
               </p>
-              {supported !== false && (
-                <div className="mt-4">
-                  <Button type="button" onClick={start} disabled={isBusy}>
-                    <Camera className="size-4" aria-hidden />
-                    Start camera
-                  </Button>
-                </div>
-              )}
+              <div className="mt-4">
+                <Button
+                  type="button"
+                  onClick={start}
+                  disabled={isBusy}
+                  isLoading={starting}
+                >
+                  {!starting && <Camera className="size-4" aria-hidden />}
+                  Start camera
+                </Button>
+              </div>
             </div>
           </div>
         )}
 
         {scanning && (
           <>
-            {/* Framing guide */}
             <div className="pointer-events-none absolute inset-0 grid place-items-center">
-              <div className="size-48 rounded-2xl border-2 border-white/70" />
+              <div className="relative size-48 rounded-2xl border-2 border-white/70">
+                <ScanLine
+                  className="absolute inset-x-0 top-1/2 mx-auto size-10 -translate-y-1/2 text-white/80"
+                  aria-hidden
+                />
+              </div>
             </div>
             <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-ink-900/70 px-4 py-3">
               <span className="inline-flex items-center gap-2 text-xs text-white">
                 <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                Scanning...
+                Scanning
+                <span className="text-slate-400">
+                  ({engine === "native" ? "fast mode" : "compatibility mode"})
+                </span>
               </span>
               <Button type="button" variant="secondary" size="sm" onClick={stop}>
                 Stop
@@ -192,11 +247,13 @@ export function CodeScanner({
       <form onSubmit={submitManual} className="flex items-end gap-2">
         <div className="flex-1">
           <Input
+            ref={manualRef}
             label="Or enter the order number"
             value={manual}
             onChange={(e) => setManual(e.target.value)}
             placeholder="RO-2026-0001"
             icon={<Keyboard className="size-4" />}
+            hint="A USB or Bluetooth scanner gun also works here."
             className="font-mono uppercase"
           />
         </div>
