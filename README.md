@@ -96,8 +96,16 @@ credentials to anyone who opens the page.
 | `npm run db:migrate` | Create a migration                  |
 | `npm run db:studio`  | Prisma Studio                       |
 | `npm run db:seed`    | Seed demo data                      |
+| `npm run db:deploy`  | Apply migrations (production)       |
 | `npm run verify`     | Pricing, checkout, return + settlement |
 | `npm run verify:crud` | Admin create/edit/delete paths       |
+
+## Deployment
+
+See [`docs/DEPLOY.md`](docs/DEPLOY.md). The short version: Vercel cannot reach a
+local PostgreSQL, so you need a hosted database (Neon is the quickest) and two
+connection strings — `DATABASE_URL` (pooled, used at runtime) and `DIRECT_URL`
+(unpooled, used by migrations).
 
 ## Project structure
 

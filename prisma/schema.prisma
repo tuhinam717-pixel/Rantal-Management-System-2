@@ -13,7 +13,13 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  // Pooled connection: serverless functions open many short-lived connections,
+  // so a pooler (Neon/Supabase pgbouncer) is required in production.
   url      = env("DATABASE_URL")
+  // Migrations need a direct, unpooled connection — poolers in transaction mode
+  // can't run the DDL that `prisma migrate deploy` issues. Locally both point
+  // at the same server.
+  directUrl = env("DIRECT_URL")
 }
 
 // ---------------------------------------------------------------------------
