@@ -60,34 +60,43 @@ function availableOf(totalStock: number, reservedStock: number) {
 export async function listProducts(options?: {
   category?: string;
   search?: string;
-}): Promise<ProductVM[]> {
+  skip?: number;
+  take?: number;
+}): Promise<{ items: ProductVM[]; total: number }> {
   const pricelistId = await getActivePricelistId();
 
-  const products = await prisma.product.findMany({
-    where: {
-      isRentable: true,
-      ...(options?.category ? { category: { slug: options.category } } : {}),
-      ...(options?.search
-        ? {
-            OR: [
-              { name: { contains: options.search, mode: "insensitive" } },
-              { sku: { contains: options.search, mode: "insensitive" } },
-            ],
-          }
-        : {}),
-    },
-    orderBy: { name: "asc" },
-    include: {
-      category: true,
-      variants: true,
-      pricelistItems: {
-        where: { pricelistId },
-        include: { rentalPeriod: true },
-      },
-    },
-  });
+  const where = {
+    isRentable: true,
+    ...(options?.category ? { category: { slug: options.category } } : {}),
+    ...(options?.search
+      ? {
+          OR: [
+            { name: { contains: options.search, mode: "insensitive" as const } },
+            { sku: { contains: options.search, mode: "insensitive" as const } },
+          ],
+        }
+      : {}),
+  };
 
-  return products.map((product) => {
+  const [products, total] = await Promise.all([
+    prisma.product.findMany({
+      where,
+      orderBy: { name: "asc" },
+      skip: options?.skip,
+      take: options?.take,
+      include: {
+        category: true,
+        variants: true,
+        pricelistItems: {
+          where: { pricelistId },
+          include: { rentalPeriod: true },
+        },
+      },
+    }),
+    prisma.product.count({ where }),
+  ]);
+
+  const items = products.map((product) => {
     // "from ₹X / unit" on the card comes from the cheapest configured rate.
     const cheapest = product.pricelistItems.reduce<
       { price: number; unit: RentalUnit } | null
@@ -121,6 +130,8 @@ export async function listProducts(options?: {
       })),
     };
   });
+
+  return { items, total };
 }
 
 export async function getProductBySlug(slug: string) {

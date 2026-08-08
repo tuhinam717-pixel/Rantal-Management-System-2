@@ -12,8 +12,10 @@ import {
 } from "@/components/ui/data-table";
 import { DateRange } from "@/components/ui/date-range";
 import { PageHeader } from "@/components/ui/page-header";
+import { Pagination } from "@/components/ui/pagination";
 import { StatusBadge } from "@/components/orders/status-badge";
 import { ViewToggle } from "@/components/ui/view-toggle";
+import { pageMeta, resolvePage } from "@/lib/pagination";
 import { resolveView } from "@/lib/view-mode";
 import { requireUser } from "@/lib/auth/current-user";
 import { listOrdersForCustomer } from "@/server/services/orders";
@@ -33,11 +35,19 @@ const COLUMNS = [
 export default async function OrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<{ view?: string; page?: string }>;
 }) {
   const user = await requireUser();
-  const view = resolveView((await searchParams).view);
-  const orders = await listOrdersForCustomer(user.id);
+  const { view: rawView, page } = await searchParams;
+  const view = resolveView(rawView);
+  const pageInfo = resolvePage(page, 10);
+
+  const { items: orders, total } = await listOrdersForCustomer(user.id, {
+    skip: pageInfo.skip,
+    take: pageInfo.take,
+  });
+
+  const meta = pageMeta(pageInfo, total);
 
   const itemsOf = (o: (typeof orders)[number]) =>
     o.lines.map((l) => `${l.product.name} x${l.quantity}`).join(", ");
@@ -46,8 +56,8 @@ export default async function OrdersPage({
     <div className="space-y-6">
       <PageHeader
         title="My rentals"
-        description={`${orders.length} ${orders.length === 1 ? "rental" : "rentals"}`}
-        actions={orders.length > 0 ? <ViewToggle current={view} /> : undefined}
+        description={`${total} ${total === 1 ? "rental" : "rentals"}`}
+        actions={total > 0 ? <ViewToggle current={view} /> : undefined}
       />
 
       {orders.length === 0 ? (
@@ -147,6 +157,13 @@ export default async function OrdersPage({
           ))}
         </DataTable>
       )}
+
+      <Pagination
+        meta={meta}
+        basePath="/orders"
+        params={{ view: view === "cards" ? "cards" : undefined }}
+        label="rentals"
+      />
     </div>
   );
 }

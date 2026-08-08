@@ -14,6 +14,7 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:bulk": "tsx prisma/seed-bulk.ts",
     "verify": "tsx --conditions=react-server scripts/verify-flow.ts",
     "verify:crud": "tsx --conditions=react-server scripts/verify-crud.ts",
     "verify:scan": "tsx --conditions=react-server scripts/verify-scan.ts",

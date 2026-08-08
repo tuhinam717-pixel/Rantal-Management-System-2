@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { ProductCard } from "@/components/products/product-card";
+import { Pagination } from "@/components/ui/pagination";
 import { getCategories, listProducts } from "@/server/services/catalog";
+import { pageMeta, resolvePage } from "@/lib/pagination";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Browse rentals" };
@@ -10,13 +12,22 @@ export const metadata: Metadata = { title: "Browse rentals" };
 export default async function ProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ category?: string; q?: string }>;
+  searchParams: Promise<{ category?: string; q?: string; page?: string }>;
 }) {
-  const { category, q } = await searchParams;
-  const [products, categories] = await Promise.all([
-    listProducts({ category, search: q }),
+  const { category, q, page } = await searchParams;
+  const pageInfo = resolvePage(page, 12);
+
+  const [{ items: products, total }, categories] = await Promise.all([
+    listProducts({
+      category,
+      search: q,
+      skip: pageInfo.skip,
+      take: pageInfo.take,
+    }),
     getCategories(),
   ]);
+
+  const meta = pageMeta(pageInfo, total);
 
   const filters = [{ slug: undefined, name: "All" }, ...categories];
 
@@ -27,8 +38,7 @@ export default async function ProductsPage({
           Browse rentals
         </h1>
         <p className="mt-1 text-sm text-ink-500">
-          {products.length} {products.length === 1 ? "product" : "products"}{" "}
-          available to rent.
+          {total} {total === 1 ? "product" : "products"} available to rent.
         </p>
       </div>
 
@@ -77,11 +87,20 @@ export default async function ProductsPage({
           </p>
         </div>
       ) : (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {products.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
+        <>
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {products.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+
+          <Pagination
+            meta={meta}
+            basePath="/products"
+            params={{ category, q }}
+            label="products"
+          />
+        </>
       )}
     </div>
   );

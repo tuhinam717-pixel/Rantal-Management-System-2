@@ -13,7 +13,9 @@ import {
   TableRow,
 } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
+import { Pagination } from "@/components/ui/pagination";
 import { ViewToggle } from "@/components/ui/view-toggle";
+import { pageMeta, resolvePage } from "@/lib/pagination";
 import { resolveView } from "@/lib/view-mode";
 import { DeleteButton } from "@/components/admin/delete-button";
 import { NewProductDialog } from "@/components/admin/new-product-dialog";
@@ -37,26 +39,33 @@ const COLUMNS = [
 export default async function AdminProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<{ view?: string; page?: string }>;
 }) {
   await requireRole("ADMIN");
-  const view = resolveView((await searchParams).view);
+  const { view: rawView, page } = await searchParams;
+  const view = resolveView(rawView);
+  const pageInfo = resolvePage(page);
 
-  const [products, categories, periods] = await Promise.all([
+  const [products, total, categories, periods] = await Promise.all([
     prisma.product.findMany({
       orderBy: { name: "asc" },
+      skip: pageInfo.skip,
+      take: pageInfo.take,
       include: {
         category: true,
         variants: true,
         _count: { select: { orderLines: true } },
       },
     }),
+    prisma.product.count(),
     prisma.category.findMany({ orderBy: { name: "asc" } }),
     prisma.rentalPeriod.findMany({
       where: { isActive: true },
       orderBy: { id: "asc" },
     }),
   ]);
+
+  const meta = pageMeta(pageInfo, total);
 
   const periodOptions = periods.map((p) => ({
     id: p.id,
@@ -79,7 +88,7 @@ export default async function AdminProductsPage({
     <div className="space-y-6">
       <PageHeader
         title="Products"
-        description={`${products.length} in the catalogue`}
+        description={`${total} in the catalogue`}
         actions={
           <>
             <ViewToggle current={view} />
@@ -272,6 +281,13 @@ export default async function AdminProductsPage({
           })}
         </DataTable>
       )}
+
+      <Pagination
+        meta={meta}
+        basePath="/admin/products"
+        params={{ view: view === "cards" ? "cards" : undefined }}
+        label="products"
+      />
     </div>
   );
 }

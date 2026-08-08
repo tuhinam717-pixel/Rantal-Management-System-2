@@ -175,15 +175,25 @@ export async function checkout(userId: string, input: CheckoutInput) {
   }, LONG_TRANSACTION);
 }
 
-export async function listOrdersForCustomer(userId: string) {
-  return prisma.rentalOrder.findMany({
-    where: { customerId: userId },
-    orderBy: { createdAt: "desc" },
-    include: {
-      lines: { include: { product: true } },
-      deposit: true,
-    },
-  });
+export async function listOrdersForCustomer(
+  userId: string,
+  options?: { skip?: number; take?: number }
+) {
+  const [items, total] = await Promise.all([
+    prisma.rentalOrder.findMany({
+      where: { customerId: userId },
+      orderBy: { createdAt: "desc" },
+      skip: options?.skip,
+      take: options?.take,
+      include: {
+        lines: { include: { product: true } },
+        deposit: true,
+      },
+    }),
+    prisma.rentalOrder.count({ where: { customerId: userId } }),
+  ]);
+
+  return { items, total };
 }
 
 export async function getOrderForCustomer(userId: string, orderId: string) {

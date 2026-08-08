@@ -11,8 +11,10 @@ import {
 } from "@/components/ui/data-table";
 import { DateRange } from "@/components/ui/date-range";
 import { PageHeader } from "@/components/ui/page-header";
+import { Pagination } from "@/components/ui/pagination";
 import { StatusBadge } from "@/components/orders/status-badge";
 import { ViewToggle } from "@/components/ui/view-toggle";
+import { pageMeta, resolvePage } from "@/lib/pagination";
 import { resolveView } from "@/lib/view-mode";
 import { requireRole } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma";
@@ -42,22 +44,32 @@ const COLUMNS = [
 export default async function AdminOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; view?: string }>;
+  searchParams: Promise<{ status?: string; view?: string; page?: string }>;
 }) {
   await requireRole("ADMIN");
-  const { status, view: rawView } = await searchParams;
+  const { status, view: rawView, page } = await searchParams;
   const view = resolveView(rawView);
+  const pageInfo = resolvePage(page);
 
-  const orders = await prisma.rentalOrder.findMany({
-    where: status ? { status: status as OrderStatus } : {},
-    orderBy: { createdAt: "desc" },
-    include: {
-      customer: { select: { name: true, email: true } },
-      lines: { include: { product: { select: { name: true } } } },
-    },
-  });
+  const where = status ? { status: status as OrderStatus } : {};
 
-  /** Keeps the current view when switching status filters. */
+  const [orders, total] = await Promise.all([
+    prisma.rentalOrder.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: pageInfo.skip,
+      take: pageInfo.take,
+      include: {
+        customer: { select: { name: true, email: true } },
+        lines: { include: { product: { select: { name: true } } } },
+      },
+    }),
+    prisma.rentalOrder.count({ where }),
+  ]);
+
+  const meta = pageMeta(pageInfo, total);
+
+  /** Switching a filter resets to page 1 but keeps the chosen layout. */
   const filterHref = (key?: string) => {
     const params = new URLSearchParams();
     if (key) params.set("status", key);
@@ -73,7 +85,7 @@ export default async function AdminOrdersPage({
     <div className="space-y-6">
       <PageHeader
         title="Rental orders"
-        description={`${orders.length} ${orders.length === 1 ? "order" : "orders"}`}
+        description={`${total} ${total === 1 ? "order" : "orders"}`}
         actions={<ViewToggle current={view} />}
       />
 
@@ -190,6 +202,13 @@ export default async function AdminOrdersPage({
           ))}
         </DataTable>
       )}
+
+      <Pagination
+        meta={meta}
+        basePath="/admin/orders"
+        params={{ status, view: view === "cards" ? "cards" : undefined }}
+        label="orders"
+      />
     </div>
   );
 }

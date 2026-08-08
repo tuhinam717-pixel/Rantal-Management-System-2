@@ -10,7 +10,9 @@ import {
   TableRow,
 } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
+import { Pagination } from "@/components/ui/pagination";
 import { ViewToggle } from "@/components/ui/view-toggle";
+import { pageMeta, resolvePage } from "@/lib/pagination";
 import { resolveView } from "@/lib/view-mode";
 import { requireRole } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma";
@@ -30,19 +32,28 @@ const COLUMNS = [
 export default async function AdminCustomersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<{ view?: string; page?: string }>;
 }) {
   await requireRole("ADMIN");
-  const view = resolveView((await searchParams).view);
+  const { view: rawView, page } = await searchParams;
+  const view = resolveView(rawView);
+  const pageInfo = resolvePage(page);
 
-  const customers = await prisma.user.findMany({
-    where: { role: "CUSTOMER" },
-    orderBy: { createdAt: "desc" },
-    include: {
-      orders: { select: { total: true, status: true } },
-      _count: { select: { orders: true, addresses: true } },
-    },
-  });
+  const [customers, total] = await Promise.all([
+    prisma.user.findMany({
+      where: { role: "CUSTOMER" },
+      orderBy: { createdAt: "desc" },
+      skip: pageInfo.skip,
+      take: pageInfo.take,
+      include: {
+        orders: { select: { total: true, status: true } },
+        _count: { select: { orders: true, addresses: true } },
+      },
+    }),
+    prisma.user.count({ where: { role: "CUSTOMER" } }),
+  ]);
+
+  const meta = pageMeta(pageInfo, total);
 
   const stats = (c: (typeof customers)[number]) => ({
     lifetime: c.orders.reduce((sum, o) => sum + Number(o.total), 0),
@@ -59,7 +70,7 @@ export default async function AdminCustomersPage({
     <div className="space-y-6">
       <PageHeader
         title="Customers"
-        description={`${customers.length} registered portal users`}
+        description={`${total} registered portal users`}
         actions={<ViewToggle current={view} />}
       />
 
@@ -178,6 +189,13 @@ export default async function AdminCustomersPage({
           })}
         </DataTable>
       )}
+
+      <Pagination
+        meta={meta}
+        basePath="/admin/customers"
+        params={{ view: view === "cards" ? "cards" : undefined }}
+        label="customers"
+      />
     </div>
   );
 }
