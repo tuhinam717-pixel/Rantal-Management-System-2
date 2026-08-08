@@ -19,6 +19,7 @@
     "verify:crud": "tsx --conditions=react-server scripts/verify-crud.ts",
     "verify:scan": "tsx --conditions=react-server scripts/verify-scan.ts",
     "verify:repairs": "tsx --conditions=react-server scripts/verify-repairs.ts",
+    "verify:insights": "tsx --conditions=react-server scripts/verify-insights.ts",
     "postinstall": "prisma generate"
   },
   "prisma": {

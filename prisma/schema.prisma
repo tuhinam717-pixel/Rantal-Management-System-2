@@ -49,6 +49,7 @@ model User {
   quotations    Quotation[]
   cart          Cart?
   paymentMethods PaymentMethod[]
+  notifications Notification[]
 
   @@index([role])
   @@map("users")
@@ -679,6 +680,35 @@ model RepairJob {
 // ---------------------------------------------------------------------------
 // Organisation-wide rental configuration
 // ---------------------------------------------------------------------------
+
+enum NotificationKind {
+  PICKUP_TOMORROW
+  RETURN_DUE_SOON
+  RETURN_OVERDUE
+  DEPOSIT_REFUNDED
+}
+
+/// In-app reminders for customers.
+///
+/// The brief asks for customer notifications and automatic reminders. These
+/// are written in-app rather than emailed so the feature works without an
+/// email provider; `dedupeKey` makes the generator safe to run repeatedly.
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      NotificationKind
+  title     String
+  body      String
+  orderId   String?
+  /// One notification per user, kind and subject per day.
+  dedupeKey String           @unique
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@index([userId, readAt])
+  @@map("notifications")
+}
 
 model OrgSettings {
   id                  String      @id @default("default")

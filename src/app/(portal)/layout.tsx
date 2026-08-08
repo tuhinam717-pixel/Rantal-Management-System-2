@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { ShoppingCart } from "lucide-react";
+import { Bell, ShoppingCart } from "lucide-react";
 
 import { Logo } from "@/components/ui/logo";
 import { PortalNavLink } from "@/components/layout/portal-nav-link";
 import { SignOutButton } from "@/components/layout/sign-out-button";
 import { requireUser } from "@/lib/auth/current-user";
 import { getCartCount } from "@/server/services/cart";
+import { getUnreadCount } from "@/server/services/notifications";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard" },
@@ -20,7 +21,10 @@ export default async function PortalLayout({
   children: React.ReactNode;
 }) {
   const user = await requireUser();
-  const cartCount = await getCartCount(user.id);
+  const [cartCount, unread] = await Promise.all([
+    getCartCount(user.id),
+    getUnreadCount(user.id),
+  ]);
 
   return (
     <div className="min-h-dvh bg-slate-50">
@@ -39,6 +43,19 @@ export default async function PortalLayout({
           </nav>
 
           <div className="flex items-center gap-3">
+            <Link
+              href="/notifications"
+              className="relative grid size-9 place-items-center rounded-lg text-ink-700 transition-colors hover:bg-slate-100"
+              aria-label={`Notifications, ${unread} unread`}
+            >
+              <Bell className="size-5" aria-hidden />
+              {unread > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 grid min-w-4.5 place-items-center rounded-full bg-red-600 px-1 text-[10px] font-semibold text-white">
+                  {unread}
+                </span>
+              )}
+            </Link>
+
             <Link
               href="/cart"
               className="relative grid size-9 place-items-center rounded-lg text-ink-700 transition-colors hover:bg-slate-100"

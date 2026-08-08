@@ -11,6 +11,7 @@ import {
   ScrollText,
   Settings,
   ShieldCheck,
+  Sparkles,
   Tags,
   Truck,
   Undo2,
@@ -44,6 +45,7 @@ const NAV_GROUPS = [
       { href: "/admin/late-fees", label: "Late fees", icon: Coins },
       { href: "/admin/quotations", label: "Quotations", icon: FileSpreadsheet },
       { href: "/admin/reports", label: "Reports", icon: BarChart3 },
+      { href: "/admin/insights", label: "Insights", icon: Sparkles },
     ],
   },
   {
