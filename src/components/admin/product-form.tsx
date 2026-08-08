@@ -24,6 +24,7 @@ export interface ProductFormValues {
   description: string;
   imageUrl: string;
   categoryId: string;
+  vendorId: string;
   totalStock: number;
   depositType: "FIXED" | "PERCENTAGE";
   depositValue: number;
@@ -34,6 +35,7 @@ export function ProductForm({
   mode,
   initial,
   categories,
+  vendors,
   periods,
   layout = "page",
   onCancel,
@@ -41,6 +43,7 @@ export function ProductForm({
   mode: "create" | "edit";
   initial?: ProductFormValues;
   categories: { id: string; name: string }[];
+  vendors: { id: string; name: string }[];
   periods: { id: string; name: string; unit: string; price: number }[];
   /** In a modal the dialog already scrolls, so the sticky bar is dropped. */
   layout?: "page" | "modal";
@@ -96,18 +99,34 @@ export function ProductForm({
           hint="Shown on the product page."
         />
 
-        <Select
-          label="Category"
-          name="categoryId"
-          defaultValue={initial?.categoryId ?? ""}
-        >
-          <option value="">Uncategorised</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </Select>
+        <FieldRow>
+          <Select
+            label="Category"
+            name="categoryId"
+            defaultValue={initial?.categoryId ?? ""}
+          >
+            <option value="">Uncategorised</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </Select>
+
+          {/* Who this stock was bought or leased from. */}
+          <Select
+            label="Vendor"
+            name="vendorId"
+            defaultValue={initial?.vendorId ?? ""}
+          >
+            <option value="">No vendor</option>
+            {vendors.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name}
+              </option>
+            ))}
+          </Select>
+        </FieldRow>
       </FormSection>
 
       <FormSection

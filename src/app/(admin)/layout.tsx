@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   BarChart3,
   Boxes,
+  Building2,
   CalendarRange,
   Coins,
   FileSpreadsheet,
@@ -57,6 +58,7 @@ const NAV_GROUPS = [
       { href: "/admin/pricelists", label: "Pricelists", icon: Tags },
       { href: "/admin/rental-periods", label: "Rental periods", icon: CalendarRange },
       { href: "/admin/customers", label: "Customers", icon: Users },
+      { href: "/admin/vendors", label: "Vendors", icon: Building2 },
       { href: "/admin/settings", label: "Settings", icon: Settings },
     ],
   },

@@ -121,6 +121,8 @@ model Product {
   sku              String    @unique
   imageUrl         String?
   categoryId       String?
+  /// Supplier this stock was bought or leased from.
+  vendorId         String?
   category         Category? @relation(fields: [categoryId], references: [id])
   isRentable       Boolean   @default(true)
   totalStock       Int       @default(0)
@@ -143,6 +145,7 @@ model Product {
   cartItems      CartItem[]
   repairJobs     RepairJob[]
   trackers       AssetTracker[]
+  vendor         Vendor?           @relation(fields: [vendorId], references: [id], onDelete: SetNull)
 
   @@index([categoryId])
   @@map("products")
@@ -672,10 +675,14 @@ model RepairJob {
   estimatedCost Decimal           @default(0) @db.Decimal(12, 2)
   actualCost    Decimal?          @db.Decimal(12, 2)
   assignedTo    String?
+  /// External workshop handling the job, when it is not done in house.
+  vendorId      String?
   notes         String?
   openedAt      DateTime          @default(now())
   startedAt     DateTime?
   completedAt   DateTime?
+
+  vendor Vendor? @relation(fields: [vendorId], references: [id], onDelete: SetNull)
 
   @@index([productId])
   @@index([status])
@@ -785,4 +792,43 @@ model TrackerPing {
 
   @@index([trackerId, recordedAt])
   @@map("tracker_pings")
+}
+
+// ---------------------------------------------------------------------------
+// Vendors (suppliers)
+//
+// Who the rental stock is bought or leased from, and who repairs it when a job
+// goes outside. This is the procurement side only — it deliberately does not
+// touch the customer money flow, which stays between the customer and the
+// business (deposit held, penalty deducted, balance refunded).
+// ---------------------------------------------------------------------------
+
+model Vendor {
+  id            String  @id @default(cuid())
+  name          String
+  contactPerson String?
+  email         String?
+  phone         String?
+  /// Tax registration, printed on purchase paperwork.
+  gstin         String?
+
+  addressLine String?
+  city        String?
+  state       String?
+  postalCode  String?
+  country     String  @default("India")
+
+  /// Agreed settlement window for the supplier's invoices.
+  paymentTermsDays Int     @default(30)
+  notes            String?
+  isActive         Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products   Product[]
+  repairJobs RepairJob[]
+
+  @@index([isActive])
+  @@map("vendors")
 }

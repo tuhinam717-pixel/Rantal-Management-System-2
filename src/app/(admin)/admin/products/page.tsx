@@ -77,7 +77,7 @@ export default async function AdminProductsPage({
     ...(search ? { OR: search } : {}),
   };
 
-  const [products, total, categories, periods] = await Promise.all([
+  const [products, total, categories, periods, vendors] = await Promise.all([
     prisma.product.findMany({
       where,
       orderBy: activeSort.orderBy,
@@ -94,6 +94,11 @@ export default async function AdminProductsPage({
     prisma.rentalPeriod.findMany({
       where: { isActive: true },
       orderBy: { id: "asc" },
+    }),
+    prisma.vendor.findMany({
+      where: { isActive: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
     }),
   ]);
 
@@ -126,7 +131,11 @@ export default async function AdminProductsPage({
         actions={
           <>
             <ViewToggle current={view} />
-            <NewProductDialog categories={categories} periods={periodOptions} />
+            <NewProductDialog
+                categories={categories}
+                vendors={vendors}
+                periods={periodOptions}
+              />
           </>
         }
       />
@@ -170,7 +179,11 @@ export default async function AdminProductsPage({
           }
           action={
             filtered ? undefined : (
-              <NewProductDialog categories={categories} periods={periodOptions} />
+              <NewProductDialog
+                categories={categories}
+                vendors={vendors}
+                periods={periodOptions}
+              />
             )
           }
         />

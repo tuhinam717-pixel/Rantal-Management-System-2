@@ -13,9 +13,11 @@ import { ProductForm } from "@/components/admin/product-form";
  */
 export function NewProductDialog({
   categories,
+  vendors,
   periods,
 }: {
   categories: { id: string; name: string }[];
+  vendors: { id: string; name: string }[];
   periods: { id: string; name: string; unit: string; price: number }[];
 }) {
   const [open, setOpen] = useState(false);
@@ -38,6 +40,7 @@ export function NewProductDialog({
           mode="create"
           layout="modal"
           categories={categories}
+          vendors={vendors}
           periods={periods}
           onCancel={() => setOpen(false)}
         />

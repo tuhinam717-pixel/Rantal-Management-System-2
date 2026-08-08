@@ -11,9 +11,14 @@ export const metadata: Metadata = { title: "New product" };
 export default async function NewProductPage() {
   await requireRole("ADMIN");
 
-  const [categories, periods] = await Promise.all([
+  const [categories, periods, vendors] = await Promise.all([
     prisma.category.findMany({ orderBy: { name: "asc" } }),
     prisma.rentalPeriod.findMany({ where: { isActive: true }, orderBy: { id: "asc" } }),
+    prisma.vendor.findMany({
+      where: { isActive: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
   ]);
 
   return (
@@ -34,6 +39,7 @@ export default async function NewProductPage() {
       <ProductForm
         mode="create"
         categories={categories}
+        vendors={vendors}
         periods={periods.map((p) => ({
           id: p.id,
           name: p.name,

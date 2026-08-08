@@ -18,7 +18,7 @@ export default async function EditProductPage({
   await requireRole("ADMIN");
   const { id } = await params;
 
-  const [product, categories, periods, defaultList] = await Promise.all([
+  const [product, categories, periods, defaultList, vendors] = await Promise.all([
     prisma.product.findUnique({
       where: { id },
       include: { variants: { orderBy: { sku: "asc" } } },
@@ -26,6 +26,11 @@ export default async function EditProductPage({
     prisma.category.findMany({ orderBy: { name: "asc" } }),
     prisma.rentalPeriod.findMany({ where: { isActive: true }, orderBy: { id: "asc" } }),
     prisma.pricelist.findFirst({ where: { isDefault: true }, select: { id: true } }),
+    prisma.vendor.findMany({
+      where: { isActive: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
   ]);
 
   if (!product) notFound();
@@ -59,6 +64,7 @@ export default async function EditProductPage({
       <ProductForm
         mode="edit"
         categories={categories}
+        vendors={vendors}
         initial={{
           id: product.id,
           name: product.name,
@@ -66,6 +72,7 @@ export default async function EditProductPage({
           description: product.description ?? "",
           imageUrl: product.imageUrl ?? "",
           categoryId: product.categoryId ?? "",
+          vendorId: product.vendorId ?? "",
           totalStock: product.totalStock,
           depositType: product.depositType,
           depositValue: Number(product.depositValue),
