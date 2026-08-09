@@ -18,7 +18,9 @@ export const metadata: Metadata = { title: "Quotation" };
 const STATUS: Record<string, { label: string; tone: BadgeTone }> = {
   SENT: { label: "Awaiting your decision", tone: "warning" },
   CONFIRMED: { label: "Accepted", tone: "success" },
-  CANCELLED: { label: "Declined", tone: "neutral" },
+  // Either side can end a quotation, so the label stays neutral rather than
+  // telling the customer they declined something the admin cancelled.
+  CANCELLED: { label: "Cancelled", tone: "neutral" },
 };
 
 const COLUMNS = [
@@ -144,7 +146,7 @@ export default async function PortalQuotationPage({
       ) : quotation.order ? (
         <Card className="flex flex-wrap items-center justify-between gap-3 p-5">
           <p className="text-sm text-ink-700">
-            You accepted this quotation — it is now rental{" "}
+            This quotation is confirmed — it is now rental{" "}
             <span className="font-medium">{quotation.order.number}</span>.
           </p>
           <Link href={`/orders/${quotation.order.id}`}>
@@ -158,7 +160,7 @@ export default async function PortalQuotationPage({
           <p className="text-sm text-ink-500">
             {expired
               ? "This quotation has expired. Ask the rental team for a fresh one."
-              : "This quotation was declined."}
+              : "This quotation was cancelled."}
           </p>
         </Card>
       )}

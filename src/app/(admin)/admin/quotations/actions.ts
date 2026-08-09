@@ -175,7 +175,12 @@ export async function confirmQuotationAction(formData: FormData) {
 
   // The same transaction the customer's Accept runs — see confirmQuotation.
   const result = await confirmQuotation(id);
-  if (!result.ok) return;
+
+  // Expired, cancelled or already confirmed: say so instead of appearing to
+  // do nothing, which is what a bare return looked like from the button.
+  if (!result.ok) {
+    redirect(`/admin/quotations?error=${encodeURIComponent(result.error)}`);
+  }
 
   revalidatePath("/admin/quotations");
   revalidatePath("/admin/orders");

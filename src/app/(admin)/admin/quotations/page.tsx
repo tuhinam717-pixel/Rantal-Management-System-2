@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CheckCircle2, FileText, XCircle } from "lucide-react";
 
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Pagination } from "@/components/ui/pagination";
@@ -63,10 +64,11 @@ export default async function AdminQuotationsPage({
     q?: string;
     sort?: string;
     status?: string;
+    error?: string;
   }>;
 }) {
   await requireRole("ADMIN");
-  const { view: rawView, page, q, sort, status } = await searchParams;
+  const { view: rawView, page, q, sort, status, error } = await searchParams;
   const view = resolveView(rawView);
   const pageInfo = resolvePage(page);
   const activeSort = resolveSort(sort, SORTS);
@@ -148,6 +150,8 @@ export default async function AdminQuotationsPage({
           </>
         }
       />
+
+      {error && <Alert tone="error">{error}</Alert>}
 
       <ListToolbar
         basePath="/admin/quotations"

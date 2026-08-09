@@ -207,9 +207,18 @@ export async function getQuotationForCustomer(userId: string, id: string) {
   });
 }
 
-/** Awaiting the customer's decision — drives the sidebar badge. */
-export async function countPendingQuotations(userId: string) {
+/**
+ * Awaiting the customer's decision — drives the sidebar badge.
+ *
+ * Expired quotations are left out: accepting one is refused, so counting it
+ * would show a number the customer can never clear.
+ */
+export async function countPendingQuotations(userId: string, now = new Date()) {
   return prisma.quotation.count({
-    where: { customerId: userId, status: "SENT" },
+    where: {
+      customerId: userId,
+      status: "SENT",
+      OR: [{ validUntil: null }, { validUntil: { gte: now } }],
+    },
   });
 }

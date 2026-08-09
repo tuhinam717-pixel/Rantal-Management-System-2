@@ -19,7 +19,9 @@ export const metadata: Metadata = { title: "My quotations" };
 const STATUS: Record<string, { label: string; tone: BadgeTone }> = {
   SENT: { label: "Awaiting your decision", tone: "warning" },
   CONFIRMED: { label: "Accepted", tone: "success" },
-  CANCELLED: { label: "Declined", tone: "neutral" },
+  // Either side can end a quotation, so the label stays neutral rather than
+  // telling the customer they declined something the admin cancelled.
+  CANCELLED: { label: "Cancelled", tone: "neutral" },
 };
 
 export default async function PortalQuotationsPage({
