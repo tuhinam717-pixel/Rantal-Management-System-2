@@ -25,9 +25,10 @@ import type { OrderStatus } from "@/types";
 
 export const metadata: Metadata = { title: "Order tracking" };
 
+// First entry is the default — the board opens on the most recent bookings.
 const SORTS: SortOption<Prisma.RentalOrderOrderByWithRelationInput>[] = [
-  { value: "due", label: "Return date (soonest)", orderBy: { rentalEnd: "asc" } },
   { value: "newest", label: "Newest first", orderBy: { createdAt: "desc" } },
+  { value: "due", label: "Return date (soonest)", orderBy: { rentalEnd: "asc" } },
   { value: "oldest", label: "Oldest first", orderBy: { createdAt: "asc" } },
   { value: "customer", label: "Customer A–Z", orderBy: { customer: { name: "asc" } } },
 ];

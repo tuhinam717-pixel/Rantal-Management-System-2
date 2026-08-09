@@ -64,7 +64,8 @@ export default async function PortalTrackingPage({
   const [orders, total] = await Promise.all([
     prisma.rentalOrder.findMany({
       where,
-      orderBy: { rentalEnd: "asc" },
+      // Newest booking first, matching the admin board's default.
+      orderBy: { createdAt: "desc" },
       skip: pageInfo.skip,
       take: pageInfo.take,
       include: {
