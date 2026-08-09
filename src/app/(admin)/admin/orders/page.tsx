@@ -16,7 +16,12 @@ import { Pagination } from "@/components/ui/pagination";
 import { StatusBadge } from "@/components/orders/status-badge";
 import { ViewToggle } from "@/components/ui/view-toggle";
 import { pageMeta, resolvePage } from "@/lib/pagination";
-import { resolveSort, textSearch, type SortOption } from "@/lib/list-query";
+import {
+  resolveEnumFilter,
+  resolveSort,
+  textSearch,
+  type SortOption,
+} from "@/lib/list-query";
 import { resolveView } from "@/lib/view-mode";
 import { requireRole } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma";
@@ -26,16 +31,19 @@ import type { Prisma } from "@prisma/client";
 
 export const metadata: Metadata = { title: "Rental orders" };
 
+// Finished rentals live in /admin/completed. This screen is the live queue,
+// so a settled or cancelled order would only be noise here.
+const CLOSED_STATUSES = ["COMPLETED", "CANCELLED"] as const;
+
 const FILTERS = [
-  { value: undefined, label: "All" },
-  { value: "ACTIVE", label: "Active" },
-  { value: "OVERDUE", label: "Overdue" },
+  { value: undefined, label: "All open" },
   { value: "CONFIRMED", label: "Confirmed" },
   { value: "READY_FOR_PICKUP", label: "Ready" },
   { value: "PICKED_UP", label: "Picked up" },
+  { value: "ACTIVE", label: "Active" },
+  { value: "RETURN_DUE", label: "Return due" },
+  { value: "OVERDUE", label: "Overdue" },
   { value: "RETURNED", label: "Returned" },
-  { value: "COMPLETED", label: "Completed" },
-  { value: "CANCELLED", label: "Cancelled" },
 ];
 
 const SORTS: SortOption<Prisma.RentalOrderOrderByWithRelationInput>[] = [
@@ -90,8 +98,15 @@ export default async function AdminOrdersPage({
     "lines.some.product.name",
   ]);
 
+  const safeStatus = resolveEnumFilter(
+    status,
+    FILTERS.map((f) => f.value)
+  );
+
   const where: Prisma.RentalOrderWhereInput = {
-    ...(status ? { status: status as OrderStatus } : {}),
+    ...(safeStatus
+      ? { status: safeStatus as OrderStatus }
+      : { status: { notIn: [...CLOSED_STATUSES] } }),
     ...(fulfilment === "delivery" ? { fulfilment: "DELIVERY" } : {}),
     ...(fulfilment === "pickup" ? { fulfilment: "STORE_PICKUP" } : {}),
     ...(search ? { OR: search } : {}),

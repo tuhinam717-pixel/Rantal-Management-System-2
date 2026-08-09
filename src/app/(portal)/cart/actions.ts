@@ -44,7 +44,15 @@ export async function addToCartAction(
 export async function updateQuantityAction(formData: FormData) {
   const user = await requireUser();
   const itemId = String(formData.get("itemId") ?? "");
-  const quantity = Number(formData.get("quantity") ?? 0);
+
+  /*
+    NaN fails every comparison, so a non-numeric value used to slip past the
+    `<= 0` check and reach an Int column, throwing out of the action. Fractions
+    did the same. The upper bound matches the add-to-cart schema, which was
+    already capped while this path was not.
+  */
+  const raw = Number(formData.get("quantity") ?? 0);
+  const quantity = Number.isInteger(raw) ? Math.min(Math.max(raw, 0), 999) : 0;
 
   if (itemId) {
     await updateCartItemQuantity(user.id, itemId, quantity);

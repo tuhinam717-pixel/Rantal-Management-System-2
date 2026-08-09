@@ -64,7 +64,13 @@ export async function updateVendorProfileAction(
 const repairUpdateSchema = z.object({
   jobId: z.string().min(1),
   notes: z.string().trim().max(500).or(z.literal("")).optional(),
-  actualCost: z.coerce.number().min(0).optional(),
+  // The field is always present in the form, so an untouched box posts "".
+  // Coercing that to 0 submitted a zero quote and wiped any approval, so an
+  // empty string is treated as "not quoting" rather than "quoting nothing".
+  actualCost: z
+    .union([z.literal(""), z.coerce.number().min(0)])
+    .optional()
+    .transform((v) => (v === "" || v === undefined ? undefined : Number(v))),
   start: z.string().optional(),
   ready: z.string().optional(),
 });

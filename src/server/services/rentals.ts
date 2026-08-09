@@ -37,6 +37,25 @@ export async function confirmPickup(orderId: string, note?: string) {
   const now = new Date();
 
   return prisma.$transaction(async (tx) => {
+    /*
+      Both callers take a bare orderId from the request and only the UI hides
+      the button, so without this a settled or cancelled order could be pushed
+      back to PICKED_UP — re-entering the active-rentals KPI and escaping the
+      overdue sweep, which only looks at orders with returnedAt null.
+    */
+    const order = await tx.rentalOrder.findUnique({
+      where: { id: orderId },
+      select: { status: true, returnedAt: true },
+    });
+
+    if (!order) throw new Error("Order not found.");
+    if (order.returnedAt || order.status === "COMPLETED") {
+      throw new Error("This rental has already been returned.");
+    }
+    if (order.status === "CANCELLED") {
+      throw new Error("This rental was cancelled.");
+    }
+
     await tx.pickup.update({
       where: { orderId },
       data: { status: "COMPLETED", confirmedAt: now, notes: note },
@@ -157,6 +176,26 @@ export async function processReturn(
   const split = settleDeposit(depositAmount, totalDeduction);
 
   return prisma.$transaction(async (tx) => {
+    /*
+      Claim the settlement atomically before doing any of it.
+
+      The returnedAt check above runs on a row read before the transaction
+      opened, so two concurrent settlements — a double-clicked Confirm, or
+      the same order settled from the order page and from the scan station —
+      both passed it. That produced two late-fee rows, two full refunds paid
+      out, and reservedStock decremented twice into negative. Only one caller
+      can flip returnedAt away from null, so the loser aborts here having
+      changed nothing.
+    */
+    const claimed = await tx.rentalOrder.updateMany({
+      where: { id: orderId, returnedAt: null },
+      data: { returnedAt },
+    });
+
+    if (claimed.count === 0) {
+      throw new Error(`Order ${order.number} has already been returned.`);
+    }
+
     const returnRow = await tx.return.update({
       where: { orderId },
       data: {

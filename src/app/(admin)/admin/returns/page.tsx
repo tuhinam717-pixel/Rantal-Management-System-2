@@ -15,7 +15,12 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Pagination } from "@/components/ui/pagination";
 import { ListToolbar } from "@/components/ui/list-toolbar";
 import { ViewToggle } from "@/components/ui/view-toggle";
-import { resolveSort, textSearch, type SortOption } from "@/lib/list-query";
+import {
+  resolveEnumFilter,
+  resolveSort,
+  textSearch,
+  type SortOption,
+} from "@/lib/list-query";
 import type { Prisma } from "@prisma/client";
 import { ReturnForm } from "@/components/pickup-return/return-form";
 import { detectOverdueAction } from "@/app/(admin)/admin/actions";
@@ -26,7 +31,7 @@ import { pageMeta, resolvePage } from "@/lib/pagination";
 import { resolveView } from "@/lib/view-mode";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Returns" };
+export const metadata: Metadata = { title: "Pending returns" };
 
 const SORTS: SortOption<Prisma.ReturnOrderByWithRelationInput>[] = [
   { value: "due", label: "Due soonest", orderBy: { scheduledFor: "asc" } },
@@ -34,6 +39,14 @@ const SORTS: SortOption<Prisma.ReturnOrderByWithRelationInput>[] = [
   { value: "order", label: "Order number", orderBy: { order: { number: "asc" } } },
   { value: "customer", label: "Customer A–Z", orderBy: { order: { customer: { name: "asc" } } } },
 ];
+
+const RETURN_STATUSES = [
+  "SCHEDULED",
+  "RECEIVED",
+  "INSPECTED",
+  "MISSED",
+  "COMPLETED",
+] as const;
 
 const COLUMNS = [
   { key: "order", label: "Order" },
@@ -64,13 +77,19 @@ export default async function AdminReturnsPage({
   const activeSort = resolveSort(sort, SORTS);
   const now = new Date();
 
+  const safeStatus = resolveEnumFilter(status, RETURN_STATUSES);
   const search = textSearch(q, ["order.number", "order.customer.name"]);
 
   const where: Prisma.ReturnWhereInput = {
+    // A return row is created at checkout, so an order still waiting to be
+    // handed over had one too. Settling that jumped it straight to COMPLETED
+    // while its pickup was still scheduled, refunding a deposit for goods the
+    // customer never received.
+    order: { status: { notIn: ["DRAFT", "CONFIRMED", "CANCELLED"] } },
     // The queue is about outstanding work, so completed returns stay hidden
     // unless the status filter asks for them explicitly.
-    ...(status
-      ? { status: status as Prisma.EnumReturnStatusFilter["equals"] }
+    ...(safeStatus
+      ? { status: safeStatus as Prisma.EnumReturnStatusFilter["equals"] }
       : { status: { not: "COMPLETED" } }),
     ...(due === "overdue" ? { scheduledFor: { lt: now } } : {}),
     ...(search ? { OR: search } : {}),
@@ -117,7 +136,7 @@ export default async function AdminReturnsPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Return schedule"
+        title="Pending returns"
         description={`${total} outstanding${overdueCount > 0 ? ` · ${overdueCount} overdue` : ""}. Penalties are calculated against the active rule and deducted from the deposit on settlement.`}
         actions={
           <>

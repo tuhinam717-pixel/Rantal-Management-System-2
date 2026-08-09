@@ -17,7 +17,12 @@ import { ViewToggle } from "@/components/ui/view-toggle";
 import { requireRole } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma";
 import { pageMeta, resolvePage } from "@/lib/pagination";
-import { resolveSort, textSearch, type SortOption } from "@/lib/list-query";
+import {
+  resolveEnumFilter,
+  resolveSort,
+  textSearch,
+  type SortOption,
+} from "@/lib/list-query";
 import { resolveView } from "@/lib/view-mode";
 import type { Prisma } from "@prisma/client";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
@@ -80,8 +85,15 @@ export default async function AdminDepositsPage({
 
   const search = textSearch(q, ["order.number", "order.customer.name"]);
 
+  const safeStatus = resolveEnumFilter(
+    status,
+    STATUS_FILTERS.map((f) => f.value)
+  );
+
   const where: Prisma.SecurityDepositWhereInput = {
-    ...(status ? { status: status as Prisma.EnumDepositStatusFilter["equals"] } : {}),
+    ...(safeStatus
+      ? { status: safeStatus as Prisma.EnumDepositStatusFilter["equals"] }
+      : {}),
     ...(search ? { OR: search } : {}),
   };
 

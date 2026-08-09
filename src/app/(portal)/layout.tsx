@@ -5,6 +5,7 @@ import {
   FileText,
   LayoutDashboard,
   MapPin,
+  Radar,
   ScrollText,
   ShoppingCart,
   Store,
@@ -44,6 +45,7 @@ export default async function PortalLayout({
       label: "My account",
       items: [
         { href: "/orders", label: "My rentals", icon: <ScrollText className="size-4" /> },
+        { href: "/tracking", label: "Track rentals", icon: <Radar className="size-4" /> },
         { href: "/quotations", label: "Quotations", icon: <FileText className="size-4" />, badge: pendingQuotes },
         { href: "/notifications", label: "Notifications", icon: <Bell className="size-4" />, badge: unread },
         { href: "/profile", label: "Profile", icon: <UserRound className="size-4" /> },

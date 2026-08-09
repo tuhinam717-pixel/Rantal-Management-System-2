@@ -126,6 +126,17 @@ export async function saveVendorLoginAction(
 
   const passwordHash = await bcrypt.hash(password, 12);
 
+  // The uniqueness check has to run on the reset path too, or changing a
+  // vendor's sign-in email to one a customer already uses throws P2002 out of
+  // a function whose contract is to return { error }.
+  const clash = await prisma.user.findFirst({
+    where: { email, NOT: { id: vendor.userId ?? "" } },
+    select: { id: true },
+  });
+  if (clash) {
+    return { error: `${email} is already used by another account.` };
+  }
+
   if (vendor.userId) {
     await prisma.user.update({
       where: { id: vendor.userId },
@@ -134,16 +145,6 @@ export async function saveVendorLoginAction(
 
     revalidatePath("/admin/vendors");
     return { ok: true };
-  }
-
-  // Email is the sign-in handle across all roles, so a clash with a customer
-  // or admin account has to be caught before we try to create the row.
-  const clash = await prisma.user.findUnique({
-    where: { email },
-    select: { id: true },
-  });
-  if (clash) {
-    return { error: `${email} is already used by another account.` };
   }
 
   const user = await prisma.user.create({

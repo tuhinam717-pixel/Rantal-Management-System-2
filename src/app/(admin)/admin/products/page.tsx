@@ -190,9 +190,13 @@ export default async function AdminProductsPage({
       ) : view === "cards" ? (
         <CardGrid>
           {products.map((product) => {
+            // Repair stock counts as unavailable everywhere else — the customer
+            // catalogue, insights and the repair dialog all subtract it.
             const available = Math.max(
               0,
-              product.totalStock - product.reservedStock
+              product.totalStock -
+                product.reservedStock -
+                product.underRepairStock
             );
 
             return (
@@ -287,9 +291,13 @@ export default async function AdminProductsPage({
       ) : (
         <DataTable columns={COLUMNS} minWidth="56rem">
           {products.map((product) => {
+            // Repair stock counts as unavailable everywhere else — the customer
+            // catalogue, insights and the repair dialog all subtract it.
             const available = Math.max(
               0,
-              product.totalStock - product.reservedStock
+              product.totalStock -
+                product.reservedStock -
+                product.underRepairStock
             );
 
             return (

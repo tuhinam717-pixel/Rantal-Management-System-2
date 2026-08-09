@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 
@@ -23,12 +23,19 @@ export function NewTemplateDialog() {
     {}
   );
 
+  /*
+    useActionState keeps its value after the dialog closes, so a reopened
+    dialog would see the previous success and shut itself immediately.
+    Comparing the state object identity is what makes each success fire once.
+  */
+  const handled = useRef<typeof state | null>(null);
+
   useEffect(() => {
-    if (state.ok && open) {
-      setOpen(false);
-      router.refresh();
-    }
-  }, [state.ok, open, router]);
+    if (!open || !state.ok || handled.current === state) return;
+    handled.current = state;
+    setOpen(false);
+    router.refresh();
+  }, [state, open, router]);
 
   return (
     <>

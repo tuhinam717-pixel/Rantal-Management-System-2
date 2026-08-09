@@ -147,8 +147,10 @@ export async function deleteAddressAction(formData: FormData) {
 
   // Used by an order? Detach it there rather than break the delivery record.
   if (address._count.shippedOrders > 0) {
+    // Scoped to this customer: an unscoped detach would clear the address
+    // from another account's orders if ids ever collided.
     await prisma.rentalOrder.updateMany({
-      where: { shippingAddressId: id },
+      where: { shippingAddressId: id, customerId: user.id },
       data: { shippingAddressId: null },
     });
   }

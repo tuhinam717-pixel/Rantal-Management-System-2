@@ -109,7 +109,15 @@ export function AddressBook({ addresses }: { addresses: AddressVM[] }) {
           Add address
         </Button>
       ) : (
+        /*
+          Keyed on the address being edited. The fields are uncontrolled, so
+          without this React reuses the same inputs when you switch from one
+          address to another: the visible values stayed on the first address
+          while the hidden id moved to the second, and saving overwrote the
+          second record with the first one's details.
+        */
         <form
+          key={editing}
           action={formAction}
           className="space-y-4 rounded-xl border border-slate-200 bg-white p-5"
         >

@@ -1,4 +1,5 @@
 import {
+  Archive,
   BarChart3,
   Boxes,
   Building2,
@@ -6,6 +7,7 @@ import {
   Coins,
   FileSpreadsheet,
   LayoutDashboard,
+  Radar,
   Radio,
   ScanLine,
   ScrollText,
@@ -29,11 +31,13 @@ const NAV_GROUPS = [
     items: [
       { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
       { href: "/admin/orders", label: "Rental orders", icon: ScrollText },
+      { href: "/admin/tracking", label: "Order tracking", icon: Radar },
       { href: "/admin/pickups", label: "Pickups", icon: Truck },
-      { href: "/admin/returns", label: "Returns", icon: Undo2 },
+      { href: "/admin/returns", label: "Pending returns", icon: Undo2 },
       { href: "/admin/scan", label: "Scan", icon: ScanLine },
       { href: "/admin/repairs", label: "Repairs", icon: Wrench },
       { href: "/admin/assets", label: "Asset tracking", icon: Radio },
+      { href: "/admin/completed", label: "Completed orders", icon: Archive },
     ],
   },
   {

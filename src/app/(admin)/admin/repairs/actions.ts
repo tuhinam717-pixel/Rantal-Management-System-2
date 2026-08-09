@@ -17,12 +17,16 @@ function refresh() {
 
 export async function startRepairAction(formData: FormData) {
   await requireRole("ADMIN");
+
+  // Only the UI restricted this to PENDING jobs. Reopening a closed one let
+  // it be closed again, decrementing underRepairStock a second time.
   const id = String(formData.get("id") ?? "");
   const assignedTo = String(formData.get("assignedTo") ?? "").trim();
   if (!id) return;
 
-  await prisma.repairJob.update({
-    where: { id },
+  // updateMany with the status in the filter: a closed job matches nothing.
+  await prisma.repairJob.updateMany({
+    where: { id, status: { in: ["PENDING", "IN_PROGRESS"] } },
     data: {
       status: "IN_PROGRESS",
       startedAt: new Date(),

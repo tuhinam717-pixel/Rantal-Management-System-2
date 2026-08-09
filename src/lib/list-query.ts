@@ -63,3 +63,19 @@ export function textSearch<TField extends string>(
     );
   });
 }
+
+/**
+ * Narrows a filter value to one the database will accept.
+ *
+ * Status filters used to be cast straight into a Prisma enum filter, so
+ * `?status=GARBAGE` in the address bar reached Postgres as an invalid enum and
+ * returned a 500. An unrecognised value now behaves like no filter at all,
+ * which is what every other unparseable list param already does.
+ */
+export function resolveEnumFilter<T extends string>(
+  value: string | undefined,
+  allowed: readonly (T | undefined)[]
+): T | undefined {
+  if (!value) return undefined;
+  return allowed.includes(value as T) ? (value as T) : undefined;
+}

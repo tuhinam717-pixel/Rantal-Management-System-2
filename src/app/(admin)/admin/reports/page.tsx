@@ -185,7 +185,13 @@ export default async function AdminReportsPage() {
                       <div
                         className="h-full rounded-full bg-brand-500"
                         style={{
-                          width: `${(product.revenue / topProducts[0].revenue) * 100}%`,
+                          // Every price can legitimately be 0, and 0/0 is NaN,
+                          // which renders as width:NaN%.
+                          width: `${
+                            topProducts[0].revenue > 0
+                              ? (product.revenue / topProducts[0].revenue) * 100
+                              : 0
+                          }%`,
                         }}
                       />
                     </div>

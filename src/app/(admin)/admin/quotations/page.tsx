@@ -11,7 +11,12 @@ import { DataTable, EmptyState, TableRow } from "@/components/ui/data-table";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { ListToolbar } from "@/components/ui/list-toolbar";
 import { pageMeta, resolvePage } from "@/lib/pagination";
-import { resolveSort, textSearch, type SortOption } from "@/lib/list-query";
+import {
+  resolveEnumFilter,
+  resolveSort,
+  textSearch,
+  type SortOption,
+} from "@/lib/list-query";
 import type { Prisma } from "@prisma/client";
 import { resolveView } from "@/lib/view-mode";
 import { DateRange } from "@/components/ui/date-range";
@@ -37,6 +42,8 @@ const SORTS: SortOption<Prisma.QuotationOrderByWithRelationInput>[] = [
   { value: "value-asc", label: "Lowest value", orderBy: { total: "asc" } },
   { value: "number", label: "Quote number", orderBy: { number: "asc" } },
 ];
+
+const QUOTATION_STATUSES = ["DRAFT", "SENT", "CONFIRMED", "CANCELLED"] as const;
 
 const STATUS_TONE: Record<string, BadgeTone> = {
   DRAFT: "neutral",
@@ -79,8 +86,12 @@ export default async function AdminQuotationsPage({
     "customer.email",
   ]);
 
+  const safeStatus = resolveEnumFilter(status, QUOTATION_STATUSES);
+
   const where: Prisma.QuotationWhereInput = {
-    ...(status ? { status: status as Prisma.EnumQuotationStatusFilter["equals"] } : {}),
+    ...(safeStatus
+      ? { status: safeStatus as Prisma.EnumQuotationStatusFilter["equals"] }
+      : {}),
     ...(search ? { OR: search } : {}),
   };
 

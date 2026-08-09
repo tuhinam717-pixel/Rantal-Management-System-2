@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, UserPlus } from "lucide-react";
 
@@ -53,12 +53,19 @@ export function QuotationBuilder({
     { id: string; name: string; email: string }[]
   >([]);
 
+  /*
+    useActionState keeps its value after the dialog closes, so a reopened
+    dialog would see the previous success and shut itself immediately.
+    Comparing the state object identity is what makes each success fire once.
+  */
+  const handled = useRef<typeof state | null>(null);
+
   useEffect(() => {
-    if (state.ok && open) {
-      setOpen(false);
-      router.refresh();
-    }
-  }, [state.ok, open, router]);
+    if (!open || !state.ok || handled.current === state) return;
+    handled.current = state;
+    setOpen(false);
+    router.refresh();
+  }, [state, open, router]);
 
   const defaults = useMemo(() => {
     const start = new Date();

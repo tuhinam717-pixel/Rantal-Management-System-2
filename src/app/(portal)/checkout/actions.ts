@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireUser } from "@/lib/auth/current-user";
+import { prisma } from "@/lib/prisma";
 import { checkout } from "@/server/services/orders";
 
 const checkoutSchema = z
@@ -39,6 +40,21 @@ export async function checkoutAction(
   }
 
   const { fulfilment, shippingAddressId, cardNumber, notes } = parsed.data;
+
+  /*
+    The address id arrives from a form field, so it has to be proved to belong
+    to this customer. Without the check, posting another customer's address id
+    put their street address on this order — and the order detail and invoice
+    pages both render it back.
+  */
+  if (shippingAddressId) {
+    const owned = await prisma.address.count({
+      where: { id: shippingAddressId, userId: user.id },
+    });
+    if (owned === 0) {
+      return { error: "That delivery address is not on your account." };
+    }
+  }
 
   let orderNumber: string;
   try {

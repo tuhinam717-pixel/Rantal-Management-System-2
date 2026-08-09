@@ -14,7 +14,12 @@ import { ListToolbar } from "@/components/ui/list-toolbar";
 import { PageHeader } from "@/components/ui/page-header";
 import { Pagination } from "@/components/ui/pagination";
 import { pageMeta, resolvePage } from "@/lib/pagination";
-import { resolveSort, textSearch, type SortOption } from "@/lib/list-query";
+import {
+  resolveEnumFilter,
+  resolveSort,
+  textSearch,
+  type SortOption,
+} from "@/lib/list-query";
 import type { Prisma } from "@prisma/client";
 import { DeleteButton } from "@/components/admin/delete-button";
 import { LateFeeRuleDialog } from "@/components/admin/late-fee-rule-form";
@@ -31,6 +36,14 @@ const SORTS: SortOption<Prisma.LateFeeOrderByWithRelationInput>[] = [
   { value: "amount", label: "Highest amount", orderBy: { amount: "desc" } },
   { value: "amount-asc", label: "Lowest amount", orderBy: { amount: "asc" } },
 ];
+
+const LATE_FEE_STATUSES = [
+  "CALCULATED",
+  "DEDUCTED_FROM_DEPOSIT",
+  "INVOICED",
+  "WAIVED",
+  "PAID",
+] as const;
 
 const STATUS_TONE: Record<string, BadgeTone> = {
   CALCULATED: "warning",
@@ -66,8 +79,12 @@ export default async function AdminLateFeesPage({
 
   const search = textSearch(q, ["order.number", "order.customer.name"]);
 
+  const safeStatus = resolveEnumFilter(status, LATE_FEE_STATUSES);
+
   const where: Prisma.LateFeeWhereInput = {
-    ...(status ? { status: status as Prisma.EnumLateFeeStatusFilter["equals"] } : {}),
+    ...(safeStatus
+      ? { status: safeStatus as Prisma.EnumLateFeeStatusFilter["equals"] }
+      : {}),
     ...(search ? { OR: search } : {}),
   };
 

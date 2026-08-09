@@ -101,6 +101,15 @@ export async function togglePricelistAction(formData: FormData) {
   const next = formData.get("isActive") === "true";
   if (!id) return;
 
+  // Deactivating the default takes the whole catalogue down —
+  // getActivePricelistId throws, and nothing in the UI can switch it back on
+  // because the Activate button is only rendered for non-default lists.
+  const list = await prisma.pricelist.findUnique({
+    where: { id },
+    select: { isDefault: true },
+  });
+  if (!list || (list.isDefault && !next)) return;
+
   await prisma.pricelist.update({ where: { id }, data: { isActive: next } });
   refreshConfig();
 }

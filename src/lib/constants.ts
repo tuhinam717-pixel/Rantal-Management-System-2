@@ -17,6 +17,9 @@ export const PROTECTED_PREFIXES = [
   "/checkout",
   "/orders",
   "/profile",
+  "/tracking",
+  "/quotations",
+  "/notifications",
   "/admin",
   "/vendor",
 ];

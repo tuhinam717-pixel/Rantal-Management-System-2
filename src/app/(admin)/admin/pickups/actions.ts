@@ -196,6 +196,10 @@ function dayBounds(day: string) {
 }
 
 export async function getChecklist(pickupId: string) {
+  // Every export in a "use server" file is a callable endpoint, so this needs
+  // the same guard as its siblings.
+  await requireRole("ADMIN");
+
   const pickup = await prisma.pickup.findUnique({
     where: { id: pickupId },
     select: { checklist: true },
