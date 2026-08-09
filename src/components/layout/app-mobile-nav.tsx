@@ -49,7 +49,7 @@ export function AppMobileNav({ children }: { children: React.ReactNode }) {
             className="absolute inset-0 bg-ink-900/50"
           />
 
-          <div className="relative flex h-dvh w-72 flex-col overflow-y-auto bg-ink-900">
+          <div className="no-scrollbar relative flex h-dvh w-72 flex-col overflow-y-auto bg-ink-900">
             <button
               type="button"
               onClick={() => setOpen(false)}

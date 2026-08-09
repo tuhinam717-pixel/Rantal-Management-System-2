@@ -96,3 +96,20 @@ body {
     radial-gradient(farthest-side at 100% 50%, rgb(17 69 55 / 0.08), transparent) right / 14px 100% no-repeat;
   background-attachment: local, local, scroll, scroll;
 }
+
+/*
+ * Scrollable without a visible scrollbar.
+ *
+ * For the dark sidebar and drawer, where a light native bar cuts a bright
+ * stripe down the rail. Keyboard and wheel scrolling are untouched — only the
+ * bar itself is hidden — so nothing becomes unreachable.
+ */
+.no-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* legacy Edge */
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}

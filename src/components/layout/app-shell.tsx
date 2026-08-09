@@ -104,7 +104,7 @@ export function AppShell({
         </span>
       </div>
 
-      <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-5">
+      <nav className="no-scrollbar flex-1 space-y-6 overflow-y-auto px-3 py-5">
         {groups.map((group, index) => (
           <div key={group.label ?? index}>
             {group.label && (
@@ -172,7 +172,12 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="mx-auto max-w-6xl px-5 py-8">{children}</main>
+        {/*
+          80rem clears the widest table in the console (66rem) with room to
+          spare, while still stopping content from stretching edge to edge on
+          an ultrawide monitor, which makes rows hard to track across.
+        */}
+        <main className="mx-auto max-w-7xl px-5 py-8 lg:px-8">{children}</main>
       </div>
     </div>
   );
