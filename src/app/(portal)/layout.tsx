@@ -10,12 +10,8 @@ import {
   UserRound,
 } from "lucide-react";
 
-import { AppImage } from "@/components/ui/app-image";
+import { AppShell } from "@/components/layout/app-shell";
 import { CatalogueSearch } from "@/components/layout/catalogue-search";
-import { Logo } from "@/components/ui/logo";
-import { PortalMobileNav } from "@/components/layout/portal-mobile-nav";
-import { PortalNavLink } from "@/components/layout/portal-nav-link";
-import { SignOutButton } from "@/components/layout/sign-out-button";
 import { requireUser } from "@/lib/auth/current-user";
 import { getCartCount } from "@/server/services/cart";
 import { getUnreadCount } from "@/server/services/notifications";
@@ -36,168 +32,62 @@ export default async function PortalLayout({
     {
       label: "Shop",
       items: [
-        { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-        { href: "/products", label: "Browse rentals", icon: Store },
-        { href: "/cart", label: "Cart", icon: ShoppingCart, badge: cartCount },
+        { href: "/dashboard", label: "Dashboard", icon: <LayoutDashboard className="size-4" /> },
+        { href: "/products", label: "Browse rentals", icon: <Store className="size-4" /> },
+        { href: "/cart", label: "Cart", icon: <ShoppingCart className="size-4" />, badge: cartCount },
       ],
     },
     {
       label: "My account",
       items: [
-        { href: "/orders", label: "My rentals", icon: ScrollText },
-        { href: "/notifications", label: "Notifications", icon: Bell, badge: unread },
-        { href: "/profile", label: "Profile", icon: UserRound },
-        { href: "/profile/addresses", label: "Addresses", icon: MapPin },
-        { href: "/profile/payment-methods", label: "Payment methods", icon: CreditCard },
+        { href: "/orders", label: "My rentals", icon: <ScrollText className="size-4" /> },
+        { href: "/notifications", label: "Notifications", icon: <Bell className="size-4" />, badge: unread },
+        { href: "/profile", label: "Profile", icon: <UserRound className="size-4" /> },
+        { href: "/profile/addresses", label: "Addresses", icon: <MapPin className="size-4" /> },
+        { href: "/profile/payment-methods", label: "Payment methods", icon: <CreditCard className="size-4" /> },
       ],
     },
   ];
 
-  const allHrefs = groups.flatMap((group) => group.items.map((i) => i.href));
-
-  // Rendered once, used by both the fixed rail and the mobile drawer.
-  const nav = (
-    <>
-      <div className="flex h-16 items-center border-b border-white/10 px-5">
-        <Link href="/dashboard">
-          <Logo inverted />
-        </Link>
-      </div>
-
-      <div className="flex items-center gap-3 border-b border-white/10 px-5 py-4">
-        <span className="relative size-10 shrink-0 overflow-hidden rounded-full bg-white/10 ring-1 ring-white/15">
-          {user.imageUrl ? (
-            <AppImage
-              src={user.imageUrl}
-              alt=""
-              fill
-              sizes="40px"
-              className="object-cover"
-            />
-          ) : (
-            <span className="grid size-full place-items-center text-slate-400">
-              <UserRound className="size-5" aria-hidden />
-            </span>
-          )}
-        </span>
-        <span className="min-w-0">
-          <span className="block truncate text-sm font-medium text-white">
-            {user.name}
-          </span>
-          <span className="block truncate text-xs text-slate-400">
-            {user.email}
-          </span>
-        </span>
-      </div>
-
-      <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-5">
-        {groups.map((group) => (
-          <div key={group.label}>
-            <p className="px-2 pb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
-              {group.label}
-            </p>
-            <div className="space-y-0.5">
-              {group.items.map((item) => (
-                <PortalNavLink
-                  key={item.href}
-                  href={item.href}
-                  icon={<item.icon className="size-4" />}
-                  badge={"badge" in item ? item.badge : undefined}
-                  siblings={allHrefs}
-                >
-                  {item.label}
-                </PortalNavLink>
-              ))}
-            </div>
-          </div>
-        ))}
-      </nav>
-
-      <div className="border-t border-white/10 p-3">
-        <SignOutButton />
-      </div>
-    </>
-  );
-
   return (
-    <div className="min-h-dvh bg-slate-100 lg:flex">
-      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col bg-ink-900 lg:flex">
-        {nav}
-      </aside>
-
-      <div className="min-w-0 flex-1">
-        {/*
-          Top bar on every breakpoint. The sidebar owns navigation, so this
-          carries the utilities: catalogue search, notifications, cart and who
-          you are signed in as. Below lg it also holds the drawer toggle and
-          the logo, which live in the rail on wider screens.
-        */}
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-4 backdrop-blur lg:px-8">
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            <PortalMobileNav>{nav}</PortalMobileNav>
-
-            <Link href="/dashboard" className="lg:hidden">
-              <Logo />
-            </Link>
-
-            <CatalogueSearch />
-          </div>
-
-          <div className="flex shrink-0 items-center gap-1">
-            <Link
-              href="/notifications"
-              className="relative grid size-9 place-items-center rounded-lg text-ink-700 transition-colors hover:bg-slate-100"
-              aria-label={`Notifications, ${unread} unread`}
-            >
-              <Bell className="size-5" aria-hidden />
-              {unread > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 grid min-w-4.5 place-items-center rounded-full bg-red-600 px-1 text-[10px] font-semibold text-white">
-                  {unread}
-                </span>
-              )}
-            </Link>
-
-            <Link
-              href="/cart"
-              className="relative grid size-9 place-items-center rounded-lg text-ink-700 transition-colors hover:bg-slate-100"
-              aria-label={`Cart, ${cartCount} item${cartCount === 1 ? "" : "s"}`}
-            >
-              <ShoppingCart className="size-5" aria-hidden />
-              {cartCount > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 grid min-w-4.5 place-items-center rounded-full bg-brand-600 px-1 text-[10px] font-semibold text-white">
-                  {cartCount}
-                </span>
-              )}
-            </Link>
-
-            <Link
-              href="/profile"
-              className="ml-1 hidden items-center gap-2 rounded-lg py-1 pl-1 pr-2 transition-colors hover:bg-slate-100 lg:flex"
-            >
-              <span className="relative size-8 shrink-0 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200">
-                {user.imageUrl ? (
-                  <AppImage
-                    src={user.imageUrl}
-                    alt=""
-                    fill
-                    sizes="32px"
-                    className="object-cover"
-                  />
-                ) : (
-                  <span className="grid size-full place-items-center text-slate-400">
-                    <UserRound className="size-4" aria-hidden />
-                  </span>
-                )}
+    <AppShell
+      subtitle="Customer portal"
+      roleLabel="Customer"
+      homeHref="/dashboard"
+      user={user}
+      groups={groups}
+      topBarStart={<CatalogueSearch />}
+      topBarEnd={
+        <>
+          <Link
+            href="/notifications"
+            className="relative grid size-9 place-items-center rounded-lg text-ink-700 transition-colors hover:bg-slate-100"
+            aria-label={`Notifications, ${unread} unread`}
+          >
+            <Bell className="size-5" aria-hidden />
+            {unread > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 grid min-w-4.5 place-items-center rounded-full bg-red-600 px-1 text-[10px] font-semibold text-white">
+                {unread}
               </span>
-              <span className="max-w-32 truncate text-sm font-medium text-ink-700">
-                {user.name}
-              </span>
-            </Link>
-          </div>
-        </header>
+            )}
+          </Link>
 
-        <main className="mx-auto max-w-5xl px-5 py-8">{children}</main>
-      </div>
-    </div>
+          <Link
+            href="/cart"
+            className="relative grid size-9 place-items-center rounded-lg text-ink-700 transition-colors hover:bg-slate-100"
+            aria-label={`Cart, ${cartCount} item${cartCount === 1 ? "" : "s"}`}
+          >
+            <ShoppingCart className="size-5" aria-hidden />
+            {cartCount > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 grid min-w-4.5 place-items-center rounded-full bg-brand-600 px-1 text-[10px] font-semibold text-white">
+                {cartCount}
+              </span>
+            )}
+          </Link>
+        </>
+      }
+    >
+      {children}
+    </AppShell>
   );
 }

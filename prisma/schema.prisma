@@ -679,6 +679,11 @@ model RepairJob {
   assignedTo    String?
   /// External workshop handling the job, when it is not done in house.
   vendorId      String?
+  /// The vendor has finished and the units are waiting to be collected.
+  /// Admin still closes the job, because closing returns stock to service and
+  /// that must not happen before the units are physically back.
+  vendorReady   Boolean           @default(false)
+  vendorReadyAt DateTime?
   notes         String?
   openedAt      DateTime          @default(now())
   startedAt     DateTime?

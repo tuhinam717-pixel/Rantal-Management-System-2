@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import type { Prisma } from "@prisma/client";
-import { Boxes } from "lucide-react";
+import { Boxes, Pencil } from "lucide-react";
 
 import { AppImage } from "@/components/ui/app-image";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { DataTable, EmptyState, TableRow } from "@/components/ui/data-table";
 import { ListToolbar } from "@/components/ui/list-toolbar";
 import { PageHeader } from "@/components/ui/page-header";
+import { VendorProductDialog } from "@/components/vendor/vendor-product-form";
 import { Pagination } from "@/components/ui/pagination";
 import { pageMeta, resolvePage } from "@/lib/pagination";
 import { resolveSort, textSearch, type SortOption } from "@/lib/list-query";
@@ -30,6 +32,7 @@ const COLUMNS = [
   { key: "repair", label: "In repair", align: "right" as const },
   { key: "available", label: "Available", align: "right" as const },
   { key: "status", label: "Listed" },
+  { key: "actions", label: "", align: "right" as const },
 ];
 
 export default async function VendorProductsPage({
@@ -68,6 +71,7 @@ export default async function VendorProductsPage({
       <PageHeader
         title="My products"
         description={`${total} product${total === 1 ? "" : "s"} you supply to this business.`}
+        actions={<VendorProductDialog />}
       />
 
       <ListToolbar
@@ -148,6 +152,27 @@ export default async function VendorProductsPage({
                   <Badge tone={product.isRentable ? "success" : "neutral"}>
                     {product.isRentable ? "Listed" : "Hidden"}
                   </Badge>
+                </td>
+
+                <td className="px-4 py-3 text-right">
+                  <VendorProductDialog
+                    initial={{
+                      id: product.id,
+                      name: product.name,
+                      sku: product.sku,
+                      description: product.description ?? "",
+                      imageUrl: product.imageUrl ?? "",
+                      totalStock: product.totalStock,
+                      committed:
+                        product.reservedStock + product.underRepairStock,
+                    }}
+                    trigger={
+                      <Button variant="soft" size="sm">
+                        <Pencil className="size-4" aria-hidden />
+                        Edit
+                      </Button>
+                    }
+                  />
                 </td>
               </TableRow>
             );

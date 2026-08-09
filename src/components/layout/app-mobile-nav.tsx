@@ -5,11 +5,11 @@ import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 
 /**
- * Drawer that carries the portal sidebar below `lg`, where the rail is hidden.
- * The sidebar content is passed in as children so there is a single source of
- * truth for the nav rather than two lists that can drift apart.
+ * Drawer that carries the sidebar below `lg`, where the rail is hidden. The
+ * rail content is passed in as children so there is a single source of truth
+ * for the nav rather than two lists that can drift apart.
  */
-export function PortalMobileNav({ children }: { children: React.ReactNode }) {
+export function AppMobileNav({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 

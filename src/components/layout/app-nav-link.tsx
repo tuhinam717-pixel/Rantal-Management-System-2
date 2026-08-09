@@ -6,13 +6,13 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 /**
- * Sidebar row for the customer portal, styled to match {@link AdminNavLink}
- * so both consoles read as one product.
+ * One sidebar row, shared by the admin console, the customer portal and the
+ * vendor portal so the three consoles cannot drift apart.
  *
  * `icon` is a rendered element, not a component: the parent is a server
  * component, and function references can't cross the RSC boundary.
  */
-export function PortalNavLink({
+export function AppNavLink({
   href,
   icon,
   badge,
@@ -24,9 +24,9 @@ export function PortalNavLink({
   badge?: number;
   children: React.ReactNode;
   /**
-   * Every href in the nav. Needed because prefix matching alone lights up two
-   * rows at once on nested routes: on /profile/addresses both "Profile" and
-   * "Addresses" match, so the most specific entry has to win.
+   * Every href in the nav. Prefix matching alone lights up two rows at once on
+   * nested routes — on /profile/addresses both "Profile" and "Addresses"
+   * match — so the most specific entry has to win.
    */
   siblings?: string[];
 }) {

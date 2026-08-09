@@ -183,6 +183,11 @@ export default async function AdminRepairsPage({
                 <Badge tone={STATUS_TONE[job.status] ?? "neutral"}>
                   {job.status.replace(/_/g, " ").toLowerCase()}
                 </Badge>
+                {job.vendorReady && (
+                  <span className="ml-1.5">
+                    <Badge tone="success">Vendor ready</Badge>
+                  </span>
+                )}
               </div>
               <p className="mt-0.5 font-mono text-xs text-ink-500">
                 {job.product.sku}
@@ -272,6 +277,11 @@ export default async function AdminRepairsPage({
                 <Badge tone={STATUS_TONE[job.status] ?? "neutral"}>
                   {job.status.replace(/_/g, " ").toLowerCase()}
                 </Badge>
+                {job.vendorReady && (
+                  <span className="ml-1.5">
+                    <Badge tone="success">Vendor ready</Badge>
+                  </span>
+                )}
               </td>
               <td className="px-4 py-3">
                 <div className="flex items-center justify-end gap-1">

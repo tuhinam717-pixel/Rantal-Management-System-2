@@ -6,6 +6,7 @@ import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { DataTable, EmptyState, TableRow } from "@/components/ui/data-table";
 import { ListToolbar } from "@/components/ui/list-toolbar";
 import { PageHeader } from "@/components/ui/page-header";
+import { RepairProgressDialog } from "@/components/vendor/repair-progress-form";
 import { Pagination } from "@/components/ui/pagination";
 import { pageMeta, resolvePage } from "@/lib/pagination";
 import { resolveSort, textSearch, type SortOption } from "@/lib/list-query";
@@ -36,6 +37,7 @@ const COLUMNS = [
   { key: "cost", label: "Cost", align: "right" as const },
   { key: "opened", label: "Opened" },
   { key: "status", label: "Status" },
+  { key: "actions", label: "", align: "right" as const },
 ];
 
 export default async function VendorRepairsPage({
@@ -154,6 +156,35 @@ export default async function VendorRepairsPage({
                 <Badge tone={STATUS_TONE[job.status] ?? "neutral"}>
                   {job.status.replace(/_/g, " ").toLowerCase()}
                 </Badge>
+                {job.vendorReady && (
+                  <span className="ml-1.5">
+                    <Badge tone="success">Ready</Badge>
+                  </span>
+                )}
+                {job.notes && (
+                  <p className="mt-1 max-w-56 truncate text-xs text-ink-500">
+                    {job.notes}
+                  </p>
+                )}
+              </td>
+
+              <td className="px-4 py-3 text-right">
+                {job.status === "PENDING" || job.status === "IN_PROGRESS" ? (
+                  <RepairProgressDialog
+                    job={{
+                      id: job.id,
+                      productName: job.product.name,
+                      issue: job.issue,
+                      status: job.status,
+                      notes: job.notes ?? "",
+                      actualCost:
+                        job.actualCost == null ? null : Number(job.actualCost),
+                      vendorReady: job.vendorReady,
+                    }}
+                  />
+                ) : (
+                  <span className="text-xs text-ink-400">Closed</span>
+                )}
               </td>
             </TableRow>
           ))}
