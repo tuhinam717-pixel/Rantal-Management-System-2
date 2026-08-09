@@ -26,7 +26,12 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Pagination } from "@/components/ui/pagination";
 import { VendorDialog } from "@/components/admin/vendor-form";
 import { ViewToggle } from "@/components/ui/view-toggle";
-import { deleteVendorAction, setVendorActiveAction } from "./actions";
+import { VendorLoginDialog } from "@/components/admin/vendor-login-form";
+import {
+  deleteVendorAction,
+  revokeVendorLoginAction,
+  setVendorActiveAction,
+} from "./actions";
 import { pageMeta, resolvePage } from "@/lib/pagination";
 import { resolveSort, textSearch, type SortOption } from "@/lib/list-query";
 import { resolveView } from "@/lib/view-mode";
@@ -51,6 +56,7 @@ const COLUMNS = [
   { key: "repairs", label: "Repairs", align: "right" as const },
   { key: "terms", label: "Terms", align: "right" as const },
   { key: "status", label: "Status" },
+  { key: "login", label: "Login" },
   { key: "actions", label: "", align: "right" as const },
 ];
 
@@ -92,7 +98,10 @@ export default async function AdminVendorsPage({
       orderBy: activeSort.orderBy,
       skip: pageInfo.skip,
       take: pageInfo.take,
-      include: { _count: { select: { products: true, repairJobs: true } } },
+      include: {
+        _count: { select: { products: true, repairJobs: true } },
+        user: { select: { email: true } },
+      },
     }),
     prisma.vendor.count({ where }),
   ]);
@@ -310,7 +319,36 @@ export default async function AdminVendorsPage({
               </td>
 
               <td className="px-4 py-3">
+                {vendor.user ? (
+                  <div className="space-y-1">
+                    <Badge tone="brand">Can sign in</Badge>
+                    <p className="truncate text-xs text-ink-500">
+                      {vendor.user.email}
+                    </p>
+                  </div>
+                ) : (
+                  <span className="text-xs text-ink-400">No account</span>
+                )}
+              </td>
+
+              <td className="px-4 py-3">
                 <div className="flex items-center justify-end gap-1">
+                  <VendorLoginDialog
+                    vendorId={vendor.id}
+                    vendorName={vendor.name}
+                    defaultEmail={vendor.user?.email ?? vendor.email ?? ""}
+                    hasLogin={Boolean(vendor.user)}
+                  />
+
+                  {vendor.user && (
+                    <form action={revokeVendorLoginAction}>
+                      <input type="hidden" name="vendorId" value={vendor.id} />
+                      <Button type="submit" variant="ghost" size="sm">
+                        Revoke
+                      </Button>
+                    </form>
+                  )}
+
                   <VendorDialog
                     initial={initialOf(vendor)}
                     trigger={

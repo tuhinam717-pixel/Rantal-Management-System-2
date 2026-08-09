@@ -129,6 +129,7 @@ const openSchema = z.object({
   issue: z.string().min(3, "Describe the problem"),
   quantity: z.coerce.number().int().min(1),
   estimatedCost: z.coerce.number().min(0),
+  vendorId: z.string().optional(),
   assignedTo: z.string().optional(),
 });
 
@@ -161,6 +162,7 @@ export async function openRepairAction(
     prisma.repairJob.create({
       data: {
         productId: parsed.data.productId,
+        vendorId: parsed.data.vendorId || null,
         issue: parsed.data.issue,
         quantity: parsed.data.quantity,
         estimatedCost: parsed.data.estimatedCost,

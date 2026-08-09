@@ -80,7 +80,7 @@ export default async function AdminRepairsPage({
     ...(search ? { OR: search } : {}),
   };
 
-  const [jobs, total, outOfService, spend, products] = await Promise.all([
+  const [jobs, total, outOfService, spend, products, vendors] = await Promise.all([
     prisma.repairJob.findMany({
       where,
       orderBy: activeSort.orderBy,
@@ -109,6 +109,11 @@ export default async function AdminRepairsPage({
         underRepairStock: true,
       },
     }),
+    prisma.vendor.findMany({
+      where: { isActive: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
   ]);
 
   const meta = pageMeta(pageInfo, total);
@@ -128,7 +133,7 @@ export default async function AdminRepairsPage({
         actions={
           <>
             <ViewToggle current={view} />
-            <OpenRepairDialog products={productOptions} />
+            <OpenRepairDialog products={productOptions} vendors={vendors} />
           </>
         }
       />

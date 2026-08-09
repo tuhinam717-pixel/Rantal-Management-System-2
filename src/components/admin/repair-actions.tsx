@@ -157,8 +157,10 @@ export function CloseRepairDialog({
 /** Manual entry for damage found outside a return. */
 export function OpenRepairDialog({
   products,
+  vendors,
 }: {
   products: { id: string; name: string; available: number }[];
+  vendors: { id: string; name: string }[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -194,6 +196,16 @@ export function OpenRepairDialog({
             {products.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name} ({p.available} free)
+              </option>
+            ))}
+          </Select>
+
+          {/* Optional: leave blank for an in-house job. */}
+          <Select label="Send to vendor" name="vendorId">
+            <option value="">Repair in house</option>
+            {vendors.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name}
               </option>
             ))}
           </Select>

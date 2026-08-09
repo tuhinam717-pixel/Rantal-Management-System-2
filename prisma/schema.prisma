@@ -29,6 +29,7 @@ datasource db {
 enum Role {
   ADMIN
   CUSTOMER
+  VENDOR
 }
 
 model User {
@@ -53,6 +54,7 @@ model User {
   cart           Cart?
   paymentMethods PaymentMethod[]
   notifications  Notification[]
+  vendor         Vendor?
 
   @@index([role])
   @@map("users")
@@ -825,6 +827,10 @@ model Vendor {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  /// Optional sign-in account, so a supplier can see their own stock and jobs.
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   products   Product[]
   repairJobs RepairJob[]

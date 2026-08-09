@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import bcrypt from "bcryptjs";
 import { z } from "zod";
 
 import { requireRole } from "@/lib/auth/current-user";
@@ -89,6 +90,95 @@ export async function setVendorActiveAction(formData: FormData) {
   if (!id) return;
 
   await prisma.vendor.update({ where: { id }, data: { isActive: next } });
+  revalidatePath("/admin/vendors");
+}
+
+const loginSchema = z.object({
+  vendorId: z.string().min(1),
+  email: z.string().trim().toLowerCase().email("Enter a valid email address"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});
+
+/**
+ * Give a supplier a sign-in account, or reset the password on the one they
+ * have. The account is an ordinary User with role VENDOR, so it reuses the
+ * existing session, middleware and sign-out plumbing rather than inventing a
+ * second kind of login.
+ */
+export async function saveVendorLoginAction(
+  _prev: FormState,
+  formData: FormData
+): Promise<FormState> {
+  await requireRole("ADMIN");
+
+  const parsed = loginSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Check the details." };
+  }
+
+  const { vendorId, email, password } = parsed.data;
+
+  const vendor = await prisma.vendor.findUnique({
+    where: { id: vendorId },
+    select: { id: true, name: true, userId: true },
+  });
+  if (!vendor) return { error: "That vendor no longer exists." };
+
+  const passwordHash = await bcrypt.hash(password, 12);
+
+  if (vendor.userId) {
+    await prisma.user.update({
+      where: { id: vendor.userId },
+      data: { email, passwordHash, isActive: true },
+    });
+
+    revalidatePath("/admin/vendors");
+    return { ok: true };
+  }
+
+  // Email is the sign-in handle across all roles, so a clash with a customer
+  // or admin account has to be caught before we try to create the row.
+  const clash = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true },
+  });
+  if (clash) {
+    return { error: `${email} is already used by another account.` };
+  }
+
+  const user = await prisma.user.create({
+    data: {
+      name: vendor.name,
+      email,
+      passwordHash,
+      role: "VENDOR",
+    },
+    select: { id: true },
+  });
+
+  await prisma.vendor.update({
+    where: { id: vendor.id },
+    data: { userId: user.id },
+  });
+
+  revalidatePath("/admin/vendors");
+  return { ok: true };
+}
+
+export async function revokeVendorLoginAction(formData: FormData) {
+  await requireRole("ADMIN");
+
+  const vendorId = String(formData.get("vendorId") ?? "");
+  if (!vendorId) return;
+
+  const vendor = await prisma.vendor.findUnique({
+    where: { id: vendorId },
+    select: { userId: true },
+  });
+  if (!vendor?.userId) return;
+
+  // Deleting the user clears vendors.userId through ON DELETE SET NULL.
+  await prisma.user.delete({ where: { id: vendor.userId } });
   revalidatePath("/admin/vendors");
 }
 
