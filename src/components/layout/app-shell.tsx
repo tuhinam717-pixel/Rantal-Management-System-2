@@ -34,7 +34,6 @@ export function AppShell({
   homeHref,
   user,
   groups,
-  sidebarFooter,
   topBarStart,
   topBarEnd,
   children,
@@ -44,34 +43,29 @@ export function AppShell({
   /** Badge next to the name in the top bar, e.g. "Administrator". */
   roleLabel: string;
   homeHref: string;
-  user: { name: string; email: string; imageUrl?: string | null };
+  user: { name: string; imageUrl?: string | null };
   groups: ShellNavGroup[];
-  sidebarFooter?: React.ReactNode;
   topBarStart?: React.ReactNode;
   topBarEnd?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const allHrefs = groups.flatMap((group) => group.items.map((i) => i.href));
 
-  const avatar = (size: "sm" | "md") => (
-    <span
-      className={
-        size === "md"
-          ? "relative size-10 shrink-0 overflow-hidden rounded-full bg-white/10 ring-1 ring-white/15"
-          : "relative size-8 shrink-0 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200"
-      }
-    >
+  // Only in the top bar — the rail carried a second copy of the same name and
+  // email, which was noise rather than information.
+  const avatar = (
+    <span className="relative size-8 shrink-0 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200">
       {user.imageUrl ? (
         <AppImage
           src={user.imageUrl}
           alt=""
           fill
-          sizes={size === "md" ? "40px" : "32px"}
+          sizes="32px"
           className="object-cover"
         />
       ) : (
         <span className="grid size-full place-items-center text-slate-400">
-          <UserRound className={size === "md" ? "size-5" : "size-4"} aria-hidden />
+          <UserRound className="size-4" aria-hidden />
         </span>
       )}
     </span>
@@ -89,18 +83,6 @@ export function AppShell({
             {APP_NAME}
           </span>
           <span className="block text-xs text-slate-400">{subtitle}</span>
-        </span>
-      </div>
-
-      <div className="flex items-center gap-3 border-b border-white/10 px-5 py-4">
-        {avatar("md")}
-        <span className="min-w-0">
-          <span className="block truncate text-sm font-medium text-white">
-            {user.name}
-          </span>
-          <span className="block truncate text-xs text-slate-400">
-            {user.email}
-          </span>
         </span>
       </div>
 
@@ -129,8 +111,7 @@ export function AppShell({
         ))}
       </nav>
 
-      <div className="space-y-2 border-t border-white/10 p-3">
-        {sidebarFooter}
+      <div className="border-t border-white/10 p-3">
         <SignOutButton />
       </div>
     </>
@@ -161,7 +142,7 @@ export function AppShell({
             {topBarEnd}
 
             <span className="ml-1 hidden items-center gap-2 rounded-lg py-1 pl-1 pr-2 lg:flex">
-              {avatar("sm")}
+              {avatar}
               <span className="max-w-32 truncate text-sm font-medium text-ink-700">
                 {user.name}
               </span>

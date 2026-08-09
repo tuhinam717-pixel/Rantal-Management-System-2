@@ -1,4 +1,3 @@
-import Link from "next/link";
 import {
   BarChart3,
   Boxes,
@@ -7,7 +6,6 @@ import {
   Coins,
   FileSpreadsheet,
   LayoutDashboard,
-  PackageCheck,
   Radio,
   ScanLine,
   ScrollText,
@@ -82,15 +80,6 @@ export default async function AdminLayout({
           icon: <Icon className="size-4" />,
         })),
       }))}
-      sidebarFooter={
-        <Link
-          href="/dashboard"
-          className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs text-slate-400 transition-colors hover:bg-white/5 hover:text-white"
-        >
-          <PackageCheck className="size-3.5" aria-hidden />
-          View customer portal
-        </Link>
-      }
     >
       {children}
     </AppShell>
