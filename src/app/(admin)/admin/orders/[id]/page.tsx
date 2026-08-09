@@ -8,6 +8,7 @@ import { DateRange } from "@/components/ui/date-range";
 import { StatusBadge } from "@/components/orders/status-badge";
 import { ReturnForm } from "@/components/pickup-return/return-form";
 import { OrderQrCode } from "@/components/scan/qr-code";
+import { isScannable } from "@/lib/rental/scannable";
 import { confirmPickupAction } from "@/app/(admin)/admin/actions";
 import { requireRole } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma";
@@ -348,7 +349,7 @@ export default async function AdminOrderDetailPage({
             </dl>
           </div>
 
-          {!settled && (
+          {isScannable(order) && (
             <div className="rounded-2xl border border-line bg-surface p-5 text-center shadow-card">
               <h2 className="text-sm font-semibold text-ink-900">Scan code</h2>
               <p className="mt-1 text-xs text-ink-500">

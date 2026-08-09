@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { PrintButton } from "@/components/orders/print-button";
 import { DateRange } from "@/components/ui/date-range";
 import { OrderQrCode } from "@/components/scan/qr-code";
+import { isScannable } from "@/lib/rental/scannable";
 import { requireUser } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma";
 import { getOrderForCustomer } from "@/server/services/orders";
@@ -93,8 +94,13 @@ export default async function InvoicePage({
               </p>
             </div>
 
-            {/* Scanned at handover and return, so bring this to the store. */}
-            <OrderQrCode orderNumber={order.number} size={104} />
+            {/*
+              Only while there is still a handover left 2014 a code on a settled
+              or cancelled invoice resolves to no action at the counter.
+            */}
+            {isScannable(order) && (
+              <OrderQrCode orderNumber={order.number} size={104} />
+            )}
           </div>
         </section>
 

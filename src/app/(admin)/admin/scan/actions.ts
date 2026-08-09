@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma";
 import { lateFee } from "@/lib/rental/pricing";
 import { parseScanCode } from "@/lib/rental/scan-code";
+import { isScannable } from "@/lib/rental/scannable";
 import { confirmPickup, processReturn } from "@/server/services/rentals";
 import { formatCurrency } from "@/lib/utils";
 
@@ -73,7 +74,10 @@ export async function lookupScanAction(code: string): Promise<ScanResult> {
         })
       : { overdueUnits: 0, amount: 0 };
 
-  const nextAction: "PICKUP" | "RETURN" | "NONE" = order.returnedAt
+  // Cancelled and completed rentals are filtered out first — without this a
+  // cancelled order still had an outstanding pickup row and the station
+  // happily offered "Confirm pickup" on it.
+  const nextAction: "PICKUP" | "RETURN" | "NONE" = !isScannable(order)
     ? "NONE"
     : order.pickup && order.pickup.status !== "COMPLETED"
       ? "PICKUP"

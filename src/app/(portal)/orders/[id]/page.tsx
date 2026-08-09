@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/orders/status-badge";
 import { DateRange } from "@/components/ui/date-range";
 import { OrderQrCode } from "@/components/scan/qr-code";
+import { isScannable } from "@/lib/rental/scannable";
 import { requireUser } from "@/lib/auth/current-user";
 import { getOrderForCustomer } from "@/server/services/orders";
 import { formatCurrency } from "@/lib/utils";
@@ -205,7 +206,7 @@ export default async function OrderDetailPage({
             </div>
           )}
 
-          {order.status !== "COMPLETED" && order.status !== "CANCELLED" && (
+          {isScannable(order) && (
             <div className="rounded-2xl border border-line bg-surface p-5 text-center shadow-card">
               <h2 className="text-sm font-semibold text-ink-900">
                 Pickup &amp; return code
