@@ -94,12 +94,14 @@ export async function createQuotationAction(
   const validUntil = new Date();
   validUntil.setDate(validUntil.getDate() + validDays);
 
-  await prisma.quotation.create({
+  const quotation = await prisma.quotation.create({
     data: {
       number: `QT-${new Date().getFullYear()}-${String(count + 1).padStart(4, "0")}`,
       customerId: data.customerId,
       templateId: template?.id,
-      status: "DRAFT",
+      // Sent straight away: a quotation that sits in a draft the customer
+      // cannot see is a stage with no purpose here.
+      status: "SENT",
       subtotal: rent,
       depositTotal: deposit,
       total: round2(rent + deposit),
@@ -119,24 +121,8 @@ export async function createQuotationAction(
     },
   });
 
-  revalidatePath("/admin/quotations");
-  return { ok: true };
-}
-
-export async function sendQuotationAction(formData: FormData) {
-  await requireRole("ADMIN");
-  const id = String(formData.get("id") ?? "");
-  if (!id) return;
-
-  const quotation = await prisma.quotation.update({
-    where: { id },
-    data: { status: "SENT" },
-    select: { id: true, number: true, customerId: true, total: true },
-  });
-
-  // "Send" used to only flip a status, so the customer never learned a
-  // quotation existed. It now reaches them: visible in their portal, and
-  // announced through the same notification bell as their rentals.
+  // The customer learns about it the moment it exists, through the same bell
+  // that carries their rental reminders.
   await prisma.notification.create({
     data: {
       userId: quotation.customerId,
@@ -149,6 +135,7 @@ export async function sendQuotationAction(formData: FormData) {
 
   revalidatePath("/admin/quotations");
   revalidatePath("/quotations");
+  return { ok: true };
 }
 
 export async function cancelQuotationAction(formData: FormData) {

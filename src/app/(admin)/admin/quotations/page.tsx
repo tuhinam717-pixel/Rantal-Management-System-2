@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CheckCircle2, FileText, Send, XCircle } from "lucide-react";
+import { CheckCircle2, FileText, XCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
@@ -20,7 +20,6 @@ import {
   cancelQuotationAction,
   confirmQuotationAction,
   deleteQuotationAction,
-  sendQuotationAction,
 } from "./actions";
 import { requireRole } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma";
@@ -288,21 +287,17 @@ export default async function AdminQuotationsPage({
 
                 {q.status !== "CONFIRMED" && q.status !== "CANCELLED" && (
                   <div className="mt-4 flex flex-wrap items-center gap-1 border-t border-line pt-3">
-                    {q.status === "DRAFT" && (
-                      <form action={sendQuotationAction}>
-                        <input type="hidden" name="id" value={q.id} />
-                        <Button type="submit" variant="secondary" size="sm">
-                          <Send className="size-4" aria-hidden />
-                          Mark as sent
-                        </Button>
-                      </form>
-                    )}
-
+                    {/*
+                      Not the admin accepting on the customer’s behalf — the
+                      customer accepts from their own portal. This is the
+                      counter case from the brief: they said yes in person, so
+                      the booking is recorded for them.
+                    */}
                     <form action={confirmQuotationAction}>
                       <input type="hidden" name="id" value={q.id} />
-                      <Button type="submit" size="sm">
+                      <Button type="submit" variant="secondary" size="sm">
                         <CheckCircle2 className="size-4" aria-hidden />
-                        Confirm and create order
+                        Confirm at counter
                       </Button>
                     </form>
 

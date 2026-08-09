@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState, useTransition } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { LayoutGrid, Table2 } from "lucide-react";
 
@@ -15,14 +16,35 @@ export function ViewToggle({ current }: { current: ViewMode }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
+
+  /*
+    The pressed state moves on click rather than waiting for the server to
+    re-render the list. On a page that runs several queries that round trip is
+    long enough that the toggle felt like it had not registered the click.
+    `optimistic` is cleared once the URL catches up.
+  */
+  const [optimistic, setOptimistic] = useState<ViewMode | null>(null);
+  const shown = optimistic ?? current;
+
+  useEffect(() => {
+    setOptimistic(null);
+  }, [current]);
 
   function setView(view: ViewMode) {
+    if (view === shown) return;
+    setOptimistic(view);
+
     const params = new URLSearchParams(searchParams.toString());
     if (view === "table") params.delete("view");
     else params.set("view", view);
 
     const query = params.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    startTransition(() => {
+      router.replace(query ? `${pathname}?${query}` : pathname, {
+        scroll: false,
+      });
+    });
   }
 
   const options: { value: ViewMode; label: string; Icon: typeof Table2 }[] = [
@@ -41,13 +63,14 @@ export function ViewToggle({ current }: { current: ViewMode }) {
           key={value}
           type="button"
           onClick={() => setView(value)}
-          aria-pressed={current === value}
+          aria-pressed={shown === value}
           title={label}
           className={cn(
             "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors",
-            current === value
+            shown === value
               ? "bg-brand-200 text-brand-800"
-              : "text-ink-500 hover:bg-brand-50 hover:text-ink-900"
+              : "text-ink-500 hover:bg-brand-50 hover:text-ink-900",
+            isPending && "opacity-70"
           )}
         >
           <Icon className="size-4" aria-hidden />
