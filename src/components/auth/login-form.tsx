@@ -5,46 +5,27 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Building2, Lock, Mail, ShieldCheck, UserRound } from "lucide-react";
+import { Lock, Mail } from "lucide-react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DEMO_ACCOUNTS } from "@/lib/constants";
 import { loginSchema, type LoginInput } from "@/lib/validations/auth";
-
-const DEMO_ICONS = {
-  ADMIN: ShieldCheck,
-  CUSTOMER: UserRound,
-  VENDOR: Building2,
-} as const;
 
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [formError, setFormError] = useState<string | null>(null);
 
-  const [demoPending, setDemoPending] = useState<string | null>(null);
-
   const {
     register,
     handleSubmit,
     setError,
-    setValue,
     formState: { errors, isSubmitting },
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
   });
-
-  /** Fills the form so the values are visible, then signs straight in. */
-  async function signInAsDemo(account: (typeof DEMO_ACCOUNTS)[number]) {
-    setValue("email", account.email);
-    setValue("password", account.password);
-    setDemoPending(account.role);
-    await onSubmit({ email: account.email, password: account.password });
-    setDemoPending(null);
-  }
 
   async function onSubmit(values: LoginInput) {
     setFormError(null);
@@ -116,49 +97,10 @@ export function LoginForm() {
         type="submit"
         size="lg"
         className="w-full"
-        isLoading={isSubmitting && !demoPending}
+        isLoading={isSubmitting}
       >
-        {isSubmitting && !demoPending ? "Signing in…" : "Sign in"}
+        {isSubmitting ? "Signing in…" : "Sign in"}
       </Button>
-
-      {/* Only rendered when NEXT_PUBLIC_ENABLE_DEMO_LOGIN=true. */}
-      {DEMO_ACCOUNTS.length > 0 && (
-      <div className="rounded-xl bg-brand-50 p-4 ring-1 ring-inset ring-brand-200">
-        <p className="text-xs font-medium text-ink-700">
-          Demo accounts
-          <span className="ml-1.5 font-normal text-ink-500">
-            one click, no typing
-          </span>
-        </p>
-
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          {DEMO_ACCOUNTS.map((account) => {
-            const Icon = DEMO_ICONS[account.role];
-            return (
-              <button
-                key={account.role}
-                type="button"
-                onClick={() => signInAsDemo(account)}
-                disabled={isSubmitting}
-                className="flex items-start gap-2.5 rounded-xl bg-surface p-3 text-left ring-1 ring-inset ring-brand-200 transition-colors hover:bg-brand-100 hover:ring-brand-400 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <Icon className="mt-0.5 size-4 shrink-0 text-brand-600" aria-hidden />
-                <span className="min-w-0">
-                  <span className="block text-sm font-medium text-ink-900">
-                    {demoPending === account.role
-                      ? "Signing in…"
-                      : `Sign in as ${account.label}`}
-                  </span>
-                  <span className="block truncate text-xs text-ink-500">
-                    {account.hint}
-                  </span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-      )}
 
       <p className="text-center text-sm text-ink-500">
         New to the portal?{" "}

@@ -20,7 +20,6 @@
     "verify:scan": "tsx --conditions=react-server scripts/verify-scan.ts",
     "verify:repairs": "tsx --conditions=react-server scripts/verify-repairs.ts",
     "verify:insights": "tsx --conditions=react-server scripts/verify-insights.ts",
-    "iot:simulate": "tsx scripts/simulate-trackers.ts",
     "postinstall": "prisma generate"
   },
   "prisma": {

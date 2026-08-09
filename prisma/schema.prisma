@@ -146,7 +146,6 @@ model Product {
   quotationLines QuotationLine[]
   cartItems      CartItem[]
   repairJobs     RepairJob[]
-  trackers       AssetTracker[]
   vendor         Vendor?           @relation(fields: [vendorId], references: [id], onDelete: SetNull)
 
   @@index([categoryId])
@@ -387,7 +386,6 @@ model RentalOrder {
   pickup   Pickup?
   return   Return?
   invoices Invoice[]
-  trackers AssetTracker[]
 
   @@index([customerId])
   @@index([status])
@@ -745,65 +743,6 @@ model OrgSettings {
   updatedAt           DateTime    @updatedAt
 
   @@map("org_settings")
-}
-
-// ---------------------------------------------------------------------------
-// IoT asset tracking
-//
-// A tracker is a physical tag on one rentable unit. Devices POST telemetry to
-// /api/iot/telemetry; the admin console reads the latest reading per tracker
-// and flags any that have gone quiet. Nothing here assumes a particular vendor
-// — anything that can make an HTTP request works.
-// ---------------------------------------------------------------------------
-
-enum TrackerStatus {
-  IDLE
-  OUT_ON_RENT
-  IN_TRANSIT
-  MISSING
-}
-
-model AssetTracker {
-  id       String  @id @default(cuid())
-  /// Printed on the tag; what the device sends to identify itself.
-  deviceId String  @unique
-  label    String?
-
-  productId String
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  /// Set while the unit is out with a customer.
-  orderId String?
-  order   RentalOrder? @relation(fields: [orderId], references: [id], onDelete: SetNull)
-
-  status     TrackerStatus @default(IDLE)
-  batteryPct Int?
-  latitude   Float?
-  longitude  Float?
-  lastSeenAt DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  pings TrackerPing[]
-
-  @@index([productId])
-  @@index([status])
-  @@map("asset_trackers")
-}
-
-model TrackerPing {
-  id        String       @id @default(cuid())
-  trackerId String
-  tracker   AssetTracker @relation(fields: [trackerId], references: [id], onDelete: Cascade)
-
-  batteryPct Int?
-  latitude   Float?
-  longitude  Float?
-  recordedAt DateTime @default(now())
-
-  @@index([trackerId, recordedAt])
-  @@map("tracker_pings")
 }
 
 // ---------------------------------------------------------------------------
