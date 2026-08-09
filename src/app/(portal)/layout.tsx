@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   Bell,
   CreditCard,
+  FileText,
   LayoutDashboard,
   MapPin,
   ScrollText,
@@ -15,6 +16,7 @@ import { CatalogueSearch } from "@/components/layout/catalogue-search";
 import { requireUser } from "@/lib/auth/current-user";
 import { getCartCount } from "@/server/services/cart";
 import { getUnreadCount } from "@/server/services/notifications";
+import { countPendingQuotations } from "@/server/services/quotations";
 
 export default async function PortalLayout({
   children,
@@ -22,9 +24,10 @@ export default async function PortalLayout({
   children: React.ReactNode;
 }) {
   const user = await requireUser();
-  const [cartCount, unread] = await Promise.all([
+  const [cartCount, unread, pendingQuotes] = await Promise.all([
     getCartCount(user.id),
     getUnreadCount(user.id),
+    countPendingQuotations(user.id),
   ]);
 
   /** Grouped so shopping is visibly separate from account management. */
@@ -41,6 +44,7 @@ export default async function PortalLayout({
       label: "My account",
       items: [
         { href: "/orders", label: "My rentals", icon: <ScrollText className="size-4" /> },
+        { href: "/quotations", label: "Quotations", icon: <FileText className="size-4" />, badge: pendingQuotes },
         { href: "/notifications", label: "Notifications", icon: <Bell className="size-4" />, badge: unread },
         { href: "/profile", label: "Profile", icon: <UserRound className="size-4" /> },
         { href: "/profile/addresses", label: "Addresses", icon: <MapPin className="size-4" /> },

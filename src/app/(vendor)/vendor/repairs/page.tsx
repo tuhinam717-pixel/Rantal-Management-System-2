@@ -161,6 +161,21 @@ export default async function VendorRepairsPage({
                     <Badge tone="success">Ready</Badge>
                   </span>
                 )}
+                {job.quoteApproved === true && (
+                  <span className="ml-1.5">
+                    <Badge tone="success">Quote approved</Badge>
+                  </span>
+                )}
+                {job.quoteApproved === false && (
+                  <span className="ml-1.5">
+                    <Badge tone="danger">Quote rejected</Badge>
+                  </span>
+                )}
+                {job.quoteSubmittedAt && job.quoteApproved == null && (
+                  <span className="ml-1.5">
+                    <Badge tone="info">Quote sent</Badge>
+                  </span>
+                )}
                 {job.notes && (
                   <p className="mt-1 max-w-56 truncate text-xs text-ink-500">
                     {job.notes}

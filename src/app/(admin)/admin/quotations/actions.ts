@@ -5,9 +5,11 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { requireRole } from "@/lib/auth/current-user";
-import { LONG_TRANSACTION, prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { billableUnits, lineDeposit, lineRent, round2 } from "@/lib/rental/pricing";
 import { getActivePricelistId } from "@/server/services/catalog";
+import { formatCurrency } from "@/lib/utils";
+import { confirmQuotation } from "@/server/services/quotations";
 
 export type FormState = { error?: string; ok?: boolean };
 
@@ -126,8 +128,27 @@ export async function sendQuotationAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 
-  await prisma.quotation.update({ where: { id }, data: { status: "SENT" } });
+  const quotation = await prisma.quotation.update({
+    where: { id },
+    data: { status: "SENT" },
+    select: { id: true, number: true, customerId: true, total: true },
+  });
+
+  // "Send" used to only flip a status, so the customer never learned a
+  // quotation existed. It now reaches them: visible in their portal, and
+  // announced through the same notification bell as their rentals.
+  await prisma.notification.create({
+    data: {
+      userId: quotation.customerId,
+      kind: "QUOTATION_SENT",
+      title: `Quotation ${quotation.number} is ready for you`,
+      body: `Review the items and total of ${formatCurrency(Number(quotation.total))}, then accept to confirm your rental.`,
+      dedupeKey: `QUOTATION_SENT:${quotation.id}`,
+    },
+  });
+
   revalidatePath("/admin/quotations");
+  revalidatePath("/quotations");
 }
 
 export async function cancelQuotationAction(formData: FormData) {
@@ -165,126 +186,14 @@ export async function confirmQuotationAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 
-  const quotation = await prisma.quotation.findUnique({
-    where: { id },
-    include: { lines: { include: { rentalPeriod: true } }, order: true },
-  });
-
-  if (!quotation || quotation.order || quotation.lines.length === 0) return;
-
-  const rentalStart = new Date(
-    Math.min(...quotation.lines.map((l) => l.rentalStart.getTime()))
-  );
-  const rentalEnd = new Date(
-    Math.max(...quotation.lines.map((l) => l.rentalEnd.getTime()))
-  );
-
-  const rent = Number(quotation.subtotal);
-  const deposit = Number(quotation.depositTotal);
-  const now = new Date();
-
-  const [orderCount, invoiceCount, products] = await Promise.all([
-    prisma.rentalOrder.count(),
-    prisma.invoice.count(),
-    prisma.product.findMany({
-      where: { id: { in: quotation.lines.map((l) => l.productId) } },
-      select: { depositType: true, depositValue: true },
-    }),
-  ]);
-
-  const uniform =
-    products.length > 0 &&
-    products.every((p) => p.depositType === products[0].depositType)
-      ? products[0]
-      : null;
-
-  const depositBasis = uniform
-    ? { type: uniform.depositType, value: Number(uniform.depositValue) }
-    : { type: "FIXED" as const, value: deposit };
-
-  await prisma.$transaction(async (tx) => {
-    const order = await tx.rentalOrder.create({
-      data: {
-        number: `RO-${now.getFullYear()}-${String(orderCount + 1).padStart(4, "0")}`,
-        customerId: quotation.customerId,
-        quotationId: quotation.id,
-        status: "CONFIRMED",
-        // Walk-in customers collect in store.
-        fulfilment: "STORE_PICKUP",
-        rentalStart,
-        rentalEnd,
-        subtotal: rent,
-        depositTotal: deposit,
-        total: round2(rent + deposit),
-        notes: quotation.notes,
-        lines: {
-          create: quotation.lines.map((line) => ({
-            productId: line.productId,
-            rentalPeriodId: line.rentalPeriodId,
-            quantity: line.quantity,
-            unitPrice: line.unitPrice,
-            depositAmount: deposit,
-            lineTotal: line.lineTotal,
-          })),
-        },
-      },
-    });
-
-    await tx.securityDeposit.create({
-      data: {
-        orderId: order.id,
-        // Same rule as portal checkout: keep the product's basis when the
-        // quotation is uniform, otherwise record the concrete summed amount.
-        type: depositBasis.type,
-        value: depositBasis.value,
-        amount: deposit,
-        status: "HELD",
-        collectedAt: now,
-        transactions: {
-          create: {
-            type: "COLLECTION",
-            amount: deposit,
-            note: `Collected in store against quotation ${quotation.number}`,
-          },
-        },
-      },
-    });
-
-    await tx.payment.createMany({
-      data: [
-        { orderId: order.id, purpose: "RENTAL", status: "PAID", amount: rent, method: "Cash", paidAt: now },
-        { orderId: order.id, purpose: "DEPOSIT", status: "PAID", amount: deposit, method: "Cash", paidAt: now },
-      ],
-    });
-
-    await tx.invoice.create({
-      data: {
-        number: `INV-${now.getFullYear()}-${String(invoiceCount + 1).padStart(4, "0")}`,
-        orderId: order.id,
-        kind: "RENTAL",
-        amount: round2(rent + deposit),
-      },
-    });
-
-    await tx.pickup.create({ data: { orderId: order.id, scheduledFor: rentalStart } });
-    await tx.return.create({ data: { orderId: order.id, scheduledFor: rentalEnd } });
-
-    for (const line of quotation.lines) {
-      await tx.product.update({
-        where: { id: line.productId },
-        data: { reservedStock: { increment: line.quantity } },
-      });
-    }
-
-    await tx.quotation.update({
-      where: { id: quotation.id },
-      data: { status: "CONFIRMED" },
-    });
-  }, LONG_TRANSACTION);
+  // The same transaction the customer's Accept runs — see confirmQuotation.
+  const result = await confirmQuotation(id);
+  if (!result.ok) return;
 
   revalidatePath("/admin/quotations");
   revalidatePath("/admin/orders");
   revalidatePath("/admin/dashboard");
+  revalidatePath("/quotations");
   redirect("/admin/orders");
 }
 

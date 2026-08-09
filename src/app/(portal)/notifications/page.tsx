@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   Bell,
   CalendarClock,
+  FileText,
   ShieldCheck,
   Truck,
 } from "lucide-react";
@@ -35,6 +36,7 @@ const KIND: Record<
     tone: "success",
     label: "Deposit",
   },
+  QUOTATION_SENT: { Icon: FileText, tone: "info", label: "Quotation" },
 };
 
 export default async function NotificationsPage() {

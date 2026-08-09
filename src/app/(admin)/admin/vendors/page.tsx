@@ -343,9 +343,12 @@ export default async function AdminVendorsPage({
                   {vendor.user && (
                     <form action={revokeVendorLoginAction}>
                       <input type="hidden" name="vendorId" value={vendor.id} />
-                      <Button type="submit" variant="ghost" size="sm">
-                        Revoke
-                      </Button>
+                      <DeleteButton
+                        label="Revoke"
+                        confirmTitle="Revoke this login?"
+                        confirmLabel="Revoke login"
+                        confirmMessage={`${vendor.name} will no longer be able to sign in. Their vendor record, products and repair history are kept.`}
+                      />
                     </form>
                   )}
 

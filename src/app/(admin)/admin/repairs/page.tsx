@@ -20,7 +20,7 @@ import {
   CloseRepairDialog,
   OpenRepairDialog,
 } from "@/components/admin/repair-actions";
-import { startRepairAction } from "./actions";
+import { decideRepairQuoteAction, startRepairAction } from "./actions";
 import { requireRole } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma";
 import { pageMeta, resolvePage } from "@/lib/pagination";
@@ -188,6 +188,37 @@ export default async function AdminRepairsPage({
                     <Badge tone="success">Vendor ready</Badge>
                   </span>
                 )}
+                {job.quoteSubmittedAt && job.quoteApproved == null && (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <Badge tone="info">
+                      Quote {formatCurrency(Number(job.actualCost ?? 0))}
+                    </Badge>
+                    <form action={decideRepairQuoteAction}>
+                      <input type="hidden" name="id" value={job.id} />
+                      <input type="hidden" name="approve" value="true" />
+                      <Button type="submit" variant="soft" size="sm">
+                        Approve
+                      </Button>
+                    </form>
+                    <form action={decideRepairQuoteAction}>
+                      <input type="hidden" name="id" value={job.id} />
+                      <input type="hidden" name="approve" value="false" />
+                      <Button type="submit" variant="ghost" size="sm">
+                        Reject
+                      </Button>
+                    </form>
+                  </div>
+                )}
+                {job.quoteApproved === true && (
+                  <span className="ml-1.5">
+                    <Badge tone="success">Quote approved</Badge>
+                  </span>
+                )}
+                {job.quoteApproved === false && (
+                  <span className="ml-1.5">
+                    <Badge tone="danger">Quote rejected</Badge>
+                  </span>
+                )}
               </div>
               <p className="mt-0.5 font-mono text-xs text-ink-500">
                 {job.product.sku}
@@ -280,6 +311,37 @@ export default async function AdminRepairsPage({
                 {job.vendorReady && (
                   <span className="ml-1.5">
                     <Badge tone="success">Vendor ready</Badge>
+                  </span>
+                )}
+                {job.quoteSubmittedAt && job.quoteApproved == null && (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <Badge tone="info">
+                      Quote {formatCurrency(Number(job.actualCost ?? 0))}
+                    </Badge>
+                    <form action={decideRepairQuoteAction}>
+                      <input type="hidden" name="id" value={job.id} />
+                      <input type="hidden" name="approve" value="true" />
+                      <Button type="submit" variant="soft" size="sm">
+                        Approve
+                      </Button>
+                    </form>
+                    <form action={decideRepairQuoteAction}>
+                      <input type="hidden" name="id" value={job.id} />
+                      <input type="hidden" name="approve" value="false" />
+                      <Button type="submit" variant="ghost" size="sm">
+                        Reject
+                      </Button>
+                    </form>
+                  </div>
+                )}
+                {job.quoteApproved === true && (
+                  <span className="ml-1.5">
+                    <Badge tone="success">Quote approved</Badge>
+                  </span>
+                )}
+                {job.quoteApproved === false && (
+                  <span className="ml-1.5">
+                    <Badge tone="danger">Quote rejected</Badge>
                   </span>
                 )}
               </td>

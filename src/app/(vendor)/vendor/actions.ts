@@ -107,7 +107,15 @@ export async function updateRepairProgressAction(
     where: { id: jobId, vendorId: vendor.id },
     data: {
       ...(notes !== undefined ? { notes: notes.trim() || null } : {}),
-      ...(actualCost !== undefined ? { actualCost } : {}),
+      // Submitting a price resets any earlier decision — the business has to
+      // approve the new figure, not inherit approval of the old one.
+      ...(actualCost !== undefined
+        ? {
+            actualCost,
+            quoteSubmittedAt: new Date(),
+            quoteApproved: null,
+          }
+        : {}),
       // Declaring the work done implies it was started.
       ...(markReady || (start === "true" && job.status === "PENDING")
         ? { status: "IN_PROGRESS", startedAt: new Date() }

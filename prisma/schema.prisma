@@ -664,30 +664,34 @@ enum RepairStatus {
 /// inspection as damaged opens one of these automatically, which withdraws the
 /// units from availability until the job is closed.
 model RepairJob {
-  id            String            @id @default(cuid())
-  productId     String
-  product       Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
-  inspectionId  String?           @unique
-  inspection    ReturnInspection? @relation(fields: [inspectionId], references: [id], onDelete: SetNull)
+  id               String            @id @default(cuid())
+  productId        String
+  product          Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  inspectionId     String?           @unique
+  inspection       ReturnInspection? @relation(fields: [inspectionId], references: [id], onDelete: SetNull)
   /// The rental that caused the damage, for traceability.
-  orderNumber   String?
-  status        RepairStatus      @default(PENDING)
-  issue         String
-  quantity      Int               @default(1)
-  estimatedCost Decimal           @default(0) @db.Decimal(12, 2)
-  actualCost    Decimal?          @db.Decimal(12, 2)
-  assignedTo    String?
+  orderNumber      String?
+  status           RepairStatus      @default(PENDING)
+  issue            String
+  quantity         Int               @default(1)
+  estimatedCost    Decimal           @default(0) @db.Decimal(12, 2)
+  actualCost       Decimal?          @db.Decimal(12, 2)
+  assignedTo       String?
   /// External workshop handling the job, when it is not done in house.
-  vendorId      String?
+  vendorId         String?
   /// The vendor has finished and the units are waiting to be collected.
   /// Admin still closes the job, because closing returns stock to service and
   /// that must not happen before the units are physically back.
-  vendorReady   Boolean           @default(false)
-  vendorReadyAt DateTime?
-  notes         String?
-  openedAt      DateTime          @default(now())
-  startedAt     DateTime?
-  completedAt   DateTime?
+  vendorReady      Boolean           @default(false)
+  vendorReadyAt    DateTime?
+  /// Vendor has priced the job and sent it for approval.
+  quoteSubmittedAt DateTime?
+  /// Null = awaiting a decision, true = approved, false = rejected.
+  quoteApproved    Boolean?
+  notes            String?
+  openedAt         DateTime          @default(now())
+  startedAt        DateTime?
+  completedAt      DateTime?
 
   vendor Vendor? @relation(fields: [vendorId], references: [id], onDelete: SetNull)
 
@@ -705,6 +709,7 @@ enum NotificationKind {
   RETURN_DUE_SOON
   RETURN_OVERDUE
   DEPOSIT_REFUNDED
+  QUOTATION_SENT
 }
 
 /// In-app reminders for customers.

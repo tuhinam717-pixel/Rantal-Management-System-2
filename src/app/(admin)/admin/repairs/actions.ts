@@ -178,3 +178,33 @@ export async function openRepairAction(
   refresh();
   return { ok: true };
 }
+
+/**
+ * Accept or reject the vendor's price for a repair.
+ *
+ * Approving copies their figure onto the job, so the cost the business reports
+ * is the one it agreed to. Rejecting leaves the figure visible but flagged, and
+ * the vendor can submit a new one.
+ */
+export async function decideRepairQuoteAction(formData: FormData) {
+  await requireRole("ADMIN");
+
+  const id = String(formData.get("id") ?? "");
+  const approve = formData.get("approve") === "true";
+  if (!id) return;
+
+  const job = await prisma.repairJob.findUnique({
+    where: { id },
+    select: { status: true, quoteSubmittedAt: true },
+  });
+  if (!job || !job.quoteSubmittedAt) return;
+  if (job.status === "COMPLETED" || job.status === "WRITTEN_OFF") return;
+
+  await prisma.repairJob.update({
+    where: { id },
+    data: { quoteApproved: approve },
+  });
+
+  refresh();
+  revalidatePath("/vendor/repairs");
+}
