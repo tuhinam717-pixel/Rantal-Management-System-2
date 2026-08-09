@@ -56,5 +56,12 @@ export const DEMO_ACCOUNTS = DEMO_LOGIN_ENABLED
         email: "customer@rentflow.test",
         password: "Customer@123",
       },
+      {
+        role: "VENDOR" as const,
+        label: "Vendor",
+        hint: "Supplied stock, rental activity, repairs",
+        email: "vendor@rentflow.test",
+        password: "Vendor@123",
+      },
     ]
   : [];

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Lock, Mail, ShieldCheck, UserRound } from "lucide-react";
+import { Building2, Lock, Mail, ShieldCheck, UserRound } from "lucide-react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,11 @@ import { Input } from "@/components/ui/input";
 import { DEMO_ACCOUNTS } from "@/lib/constants";
 import { loginSchema, type LoginInput } from "@/lib/validations/auth";
 
-const DEMO_ICONS = { ADMIN: ShieldCheck, CUSTOMER: UserRound } as const;
+const DEMO_ICONS = {
+  ADMIN: ShieldCheck,
+  CUSTOMER: UserRound,
+  VENDOR: Building2,
+} as const;
 
 export function LoginForm() {
   const router = useRouter();
